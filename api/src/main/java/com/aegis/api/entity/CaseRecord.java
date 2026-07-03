@@ -14,8 +14,18 @@ public class CaseRecord {
     @Id
     private String complaintId;
 
+    /** High-entropy customer tracking token — the only key the public status endpoint accepts. */
+    @Column(unique = true)
+    private String trackingToken;
+
+    private String customerName;
+
     @Column(columnDefinition = "text")
     private String complaintText;
+
+    /** Newline-separated grounding-check findings on the AI draft (null = clean). */
+    @Column(columnDefinition = "text")
+    private String draftWarnings;
 
     private String category;
     private double confidence;
@@ -59,6 +69,15 @@ public class CaseRecord {
 
     public String getComplaintId() { return complaintId; }
     public void setComplaintId(String v) { this.complaintId = v; }
+
+    public String getTrackingToken() { return trackingToken; }
+    public void setTrackingToken(String v) { this.trackingToken = v; }
+
+    public String getCustomerName() { return customerName; }
+    public void setCustomerName(String v) { this.customerName = v; }
+
+    public String getDraftWarnings() { return draftWarnings; }
+    public void setDraftWarnings(String v) { this.draftWarnings = v; }
 
     public String getComplaintText() { return complaintText; }
     public void setComplaintText(String v) { this.complaintText = v; }

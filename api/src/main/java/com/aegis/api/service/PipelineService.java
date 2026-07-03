@@ -27,18 +27,20 @@ public class PipelineService {
     private final ComplianceEngine compliance;
     private final RagRetriever retriever;
     private final DraftService drafting;
+    private final DraftVerifier verifier;
     private final EscalationDecider escalation;
     private final UrgencyRouter urgencyRouter;
     private final AuditService audit;
 
     public PipelineService(ClassifierClient classifier, ComplianceEngine compliance,
-                           RagRetriever retriever, DraftService drafting,
+                           RagRetriever retriever, DraftService drafting, DraftVerifier verifier,
                            EscalationDecider escalation, UrgencyRouter urgencyRouter,
                            AuditService audit) {
         this.classifier = classifier;
         this.compliance = compliance;
         this.retriever = retriever;
         this.drafting = drafting;
+        this.verifier = verifier;
         this.escalation = escalation;
         this.urgencyRouter = urgencyRouter;
         this.audit = audit;
@@ -62,6 +64,12 @@ public class PipelineService {
         RetrievedContext context = retriever.retrieve(req.text(), 4);
         Draft draft = drafting.draft(customer, id, prediction.label(), summary, comp, context);
 
+        // Phase 4c — grounding check: does every figure/contact detail in the draft
+        // actually come from the complaint, the retrieved context, or the case facts?
+        List<String> draftWarnings = verifier.verify(draft.subject(), draft.body(),
+                req.text(), context == null ? "" : context.text(),
+                comp.clause(), comp.ackDue(), comp.resolutionDue());
+
         // Phase 6 — escalation decision
         Escalation esc = escalation.decide(comp.riskFlags(), prediction.confidence());
 
@@ -76,7 +84,7 @@ public class PipelineService {
                 id, prediction, comp, draft, tasks, esc, urgency, "IN_REVIEW", channel);
 
         // Phase 7 — audit
-        audit.record(response, req.text());
+        audit.record(response, req.text(), customer, draftWarnings);
         return response;
     }
 

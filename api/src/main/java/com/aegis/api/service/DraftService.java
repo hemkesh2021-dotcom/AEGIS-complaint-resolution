@@ -6,6 +6,8 @@ import com.aegis.api.service.RagRetriever.RetrievedContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import java.io.InputStream;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -22,11 +24,38 @@ import org.springframework.stereotype.Service;
  * <p>If a chat model (NVIDIA NIM) is available, generate a reply grounded in the
  * retrieved regulation context (RAG). On any failure — no key, timeout, error —
  * fall back to the deterministic template engine, so the pipeline never breaks.
+ *
+ * <p>Privacy: the customer's name never leaves the trust boundary — prompts use a
+ * {@code {CUSTOMER_NAME}} token that is substituted locally after generation, and
+ * complaint text is passed through {@link PiiRedactor} before any external call.
  */
 @Service
 public class DraftService {
 
     private static final Logger log = LoggerFactory.getLogger(DraftService.class);
+
+    /** Local-substitution token so real names are never sent to the external LLM. */
+    static final String NAME_TOKEN = "{CUSTOMER_NAME}";
+
+    private static final DateTimeFormatter ISO_MIN = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
+    private static final DateTimeFormatter HUMAN_DATE = DateTimeFormatter.ofPattern("MMMM d, yyyy");
+
+    private static final String SYSTEM_PROMPT =
+            "You are a professional bank complaint-response assistant. Write a formal, "
+            + "empathetic reply to the customer in PLAIN TEXT — no markdown, asterisks, "
+            + "headings, bullet symbols, or code fences. Ground the reply ONLY in the provided "
+            + "regulation context and case facts, cite the relevant clause, and state the deadline. "
+            + "HARD RULES — violating any of these makes the reply unusable: "
+            + "(1) Use only monetary amounts, dates, and account details that appear verbatim in the "
+            + "complaint or the provided context. If the complaint does not state an amount, do not mention one. "
+            + "(2) Never invent phone numbers, email addresses, URLs, addresses, or names. If the customer "
+            + "needs to reach us, tell them to reply to this message. "
+            + "(3) Never use bracket placeholders such as [Bank Name] or [Agent Name] — write \"our team\" "
+            + "or omit the detail entirely. "
+            + "(4) Address the customer exactly as {CUSTOMER_NAME} — do not guess, expand, or replace their name. "
+            + "(5) Write all dates in a human-readable form (e.g., \"August 13, 2026\"), never machine "
+            + "timestamps like 2026-08-13T20:25. "
+            + "Start with a 'Subject:' line.";
 
     /** A response template loaded from templates.json. */
     public record Template(String category, String subject, String body) {
@@ -34,9 +63,11 @@ public class DraftService {
 
     private final Map<String, Template> templates = new HashMap<>();
     private final ObjectProvider<ChatModel> chatModelProvider;
+    private final PiiRedactor redactor;
 
-    public DraftService(ObjectProvider<ChatModel> chatModelProvider) {
+    public DraftService(ObjectProvider<ChatModel> chatModelProvider, PiiRedactor redactor) {
         this.chatModelProvider = chatModelProvider;
+        this.redactor = redactor;
     }
 
     @PostConstruct
@@ -56,15 +87,13 @@ public class DraftService {
             try {
                 String reply = ChatClient.create(chatModel)
                         .prompt()
-                        .system("You are a professional bank complaint-response assistant. Write a formal, "
-                                + "empathetic reply to the customer in PLAIN TEXT — no markdown, asterisks, "
-                                + "headings, bullet symbols, or code fences. Ground it ONLY in the provided "
-                                + "regulation context and case facts, cite the relevant clause, state the "
-                                + "deadline, and do not invent facts. Start with a 'Subject:' line.")
-                        .user(buildPrompt(customerName, complaintId, category, summary, compliance, context))
+                        .system(SYSTEM_PROMPT)
+                        .user(buildPrompt(complaintId, category, summary, compliance, context))
                         .call()
                         .content();
                 if (reply != null && !reply.isBlank()) {
+                    // substitute the real name locally — it was never sent to the LLM
+                    reply = reply.replace(NAME_TOKEN, customerName);
                     return new Draft(extractSubject(reply, complaintId), cleanReply(reply), "NVIDIA NIM (RAG)");
                 }
             } catch (Exception e) {
@@ -74,19 +103,31 @@ public class DraftService {
         return templateDraft(customerName, complaintId, category, summary, compliance);
     }
 
-    private String buildPrompt(String customerName, String complaintId, String category,
+    private String buildPrompt(String complaintId, String category,
                                String summary, Compliance compliance, RetrievedContext context) {
         String ctx = (context == null || context.isEmpty())
                 ? "(no additional context retrieved)"
                 : context.text();
-        return "Customer name: " + customerName + "\n"
+        return "Customer name: " + NAME_TOKEN + "  (a placeholder — use it verbatim in the salutation)\n"
                 + "Complaint ID: " + complaintId + "\n"
                 + "Product category: " + category + "\n"
-                + "Complaint: " + summary + "\n"
+                + "Complaint (sensitive identifiers redacted): " + redactor.redact(summary) + "\n"
                 + "Regulatory clause: " + compliance.clause() + "\n"
-                + "Resolution deadline: " + compliance.resolutionDue() + "\n\n"
+                + "Resolution deadline: " + humanDate(compliance.resolutionDue()) + "\n\n"
                 + "Relevant regulation context:\n" + ctx + "\n\n"
                 + "Write the complete reply (a Subject line followed by the body).";
+    }
+
+    /** "2026-08-13T20:25" → "August 13, 2026" (falls back to the input if unparseable). */
+    static String humanDate(String iso) {
+        if (iso == null || iso.isBlank()) {
+            return "";
+        }
+        try {
+            return LocalDateTime.parse(iso, ISO_MIN).format(HUMAN_DATE);
+        } catch (Exception e) {
+            return iso;
+        }
     }
 
     private String extractSubject(String reply, String complaintId) {
@@ -127,22 +168,31 @@ public class DraftService {
     }
 
     /** Short, customer-facing summary of the approved reply (LLM, with an extract fallback). */
-    public String summarize(String reply) {
+    public String summarize(String reply, String customerName) {
         if (reply == null || reply.isBlank()) {
             return "";
         }
+        // Privacy: tokenize the name and redact identifiers before the external call.
+        String safe = reply;
+        if (customerName != null && !customerName.isBlank()) {
+            safe = safe.replace(customerName, NAME_TOKEN);
+        }
+        safe = redactor.redact(safe);
+
         ChatModel chatModel = chatModelProvider.getIfAvailable();
         if (chatModel != null) {
             try {
                 String s = ChatClient.create(chatModel)
                         .prompt()
                         .system("Summarize the following bank complaint-response letter for the customer in 1-2 short, "
-                                + "plain-text sentences. Focus on what was decided and the deadline. No preamble, no markdown.")
-                        .user(reply)
+                                + "plain-text sentences. Focus on what was decided and the deadline. Use only facts "
+                                + "from the letter — do not add amounts, dates, or contact details that are not in it. "
+                                + "No preamble, no markdown.")
+                        .user(safe)
                         .call()
                         .content();
                 if (s != null && !s.isBlank()) {
-                    return s.strip();
+                    return s.strip().replace(NAME_TOKEN, customerName == null ? "" : customerName);
                 }
             } catch (Exception e) {
                 log.warn("Summary generation failed ({}); using extract fallback.", e.getMessage());
@@ -161,8 +211,8 @@ public class DraftService {
         fields.put("complaint_id", complaintId);
         fields.put("category", category);
         fields.put("complaint_summary", summary);
-        fields.put("ack_due", compliance.ackDue());
-        fields.put("resolution_due", compliance.resolutionDue());
+        fields.put("ack_due", humanDate(compliance.ackDue()));
+        fields.put("resolution_due", humanDate(compliance.resolutionDue()));
         fields.put("clause", compliance.clause());
         fields.put("resolution_notes", "Your complaint is under review by our support team.");
 

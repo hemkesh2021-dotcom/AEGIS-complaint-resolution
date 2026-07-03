@@ -4,6 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>AEGIS Operator Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#0C0A08; --bg-2:#0A0806;
@@ -16,7 +19,8 @@
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
-  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  .brand,.hero h1,.wstitle,.metric b{font-family:'Space Grotesk','Inter',system-ui,sans-serif;letter-spacing:.01em}
   body::before,body::after{content:"";position:fixed;z-index:0;filter:blur(90px);opacity:.5;pointer-events:none}
   body::before{width:520px;height:520px;left:-160px;top:-140px;background:radial-gradient(circle,rgba(221,179,90,.34),transparent 62%)}
   body::after{width:620px;height:620px;right:-220px;bottom:-220px;background:radial-gradient(circle,rgba(184,134,47,.26),transparent 62%)}
@@ -114,9 +118,37 @@
   .tl .ph{font-size:12px;font-weight:600;color:var(--gold-hi);text-transform:capitalize}.tl .dt{font-size:12.5px;color:var(--muted);margin-top:2px}
   .hide{display:none}
   @media(max-width:820px){.layout{grid-template-columns:1fr}aside{position:static;height:auto}.grid{grid-template-columns:1fr}main{padding:20px 16px}}
+
+  /* ── elevation layer ─────────────────────────────────────────── */
+  #fx{position:fixed;inset:0;z-index:0;pointer-events:none}
+  body::before{animation:drift1 26s ease-in-out infinite alternate}
+  body::after{animation:drift2 32s ease-in-out infinite alternate}
+  @keyframes drift1{from{transform:translate(0,0) scale(1)}to{transform:translate(60px,40px) scale(1.15)}}
+  @keyframes drift2{from{transform:translate(0,0) scale(1)}to{transform:translate(-70px,-50px) scale(1.1)}}
+  .card{transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease;position:relative}
+  .card:hover{transform:translateY(-2px);border-color:var(--border-strong);box-shadow:0 16px 50px rgba(8,5,2,.65),0 0 0 1px rgba(240,207,142,.08),0 0 34px -12px rgba(221,179,90,.35)}
+  .btn{position:relative;overflow:hidden}
+  .btn::after{content:"";position:absolute;top:0;left:-80%;width:50%;height:100%;transform:skewX(-22deg);
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);transition:left .5s ease;pointer-events:none}
+  .btn:hover::after{left:130%}
+  .btn:active{transform:scale(.985)}
+  tr.clickable:hover td:first-child{color:var(--gold-hi)}
+  .navbtn.active{box-shadow:inset 0 0 20px -8px rgba(221,179,90,.35)}
+  .brand .mark{animation:markGlow 3.6s ease-in-out infinite}
+  @keyframes markGlow{0%,100%{box-shadow:0 4px 16px rgba(221,179,90,.35)}50%{box-shadow:0 4px 28px rgba(221,179,90,.65)}}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-thumb{background:rgba(240,207,142,.18);border-radius:6px;border:2px solid var(--bg)}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(240,207,142,.32)}
+  ::-webkit-scrollbar-track{background:transparent}
+  @media (prefers-reduced-motion: reduce){
+    body::before,body::after,.brand .mark{animation:none}
+    .card,.btn::after{transition:none}
+    #fx{display:none}
+  }
 </style>
 </head>
 <body>
+<canvas id="fx" aria-hidden="true"></canvas>
 <div class="layout">
   <aside>
     <div class="brand"><span class="mark"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#2A1C04" stroke-width="2.2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/></svg></span><span>AEGIS<small>Operator Console</small></span></div>
@@ -124,6 +156,7 @@
       <button class="navbtn active" data-tab="queue"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Review queue<span class="cnt hide" id="qCount">0</span></button>
       <button class="navbtn" data-tab="esc"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l9 16H3z"/><path d="M12 9v5M12 17v.5"/></svg>Escalations</button>
       <button class="navbtn" data-tab="new"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New case</button>
+      <button class="navbtn" data-tab="sys"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9z"/><path d="M12 11l8-4.5M12 11v9M12 11L4 6.5"/></svg>System map <span style="margin-left:auto;font-size:9.5px;font-weight:700;color:var(--gold-hi);border:1px solid var(--border-strong);border-radius:8px;padding:1px 6px">3D</span></button>
     </nav>
     <div class="panel">
       <div class="status-title">System status</div>
@@ -177,6 +210,14 @@
       </div>
       <div id="results"></div>
     </section>
+
+    <!-- SYSTEM MAP (3D) -->
+    <section id="tab-sys" class="hide">
+      <div class="card full" style="padding:0;overflow:hidden;height:calc(100vh - 170px);min-height:480px;position:relative">
+        <iframe id="sysFrame" data-src="architecture.html?embed=1" title="AEGIS 3D system architecture" style="width:100%;height:100%;border:0;display:block;background:#0C0A08"></iframe>
+        <a href="architecture.html" target="_blank" style="position:absolute;top:12px;right:14px;font-size:11.5px;color:var(--muted);text-decoration:none;border:1px solid var(--border);border-radius:16px;padding:5px 11px;background:rgba(12,10,8,.6);backdrop-filter:blur(8px)">Open full screen ↗</a>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -206,8 +247,9 @@ EXAMPLES.forEach((e,i)=>{const o=document.createElement("option");o.value=i;o.te
 function loadExample(){const e=EXAMPLES[$("#ex").value];if(!e)return;$("#text").value=e.text;$("#cust").value=e.cust}
 loadExample();
 function activate(t){document.querySelectorAll(".navbtn").forEach(x=>x.classList.toggle("active",x.dataset.tab===t));
-  ["queue","esc","new"].forEach(x=>$("#tab-"+x).classList.toggle("hide",x!==t));
-  if(t==="queue")loadQueue(); if(t==="esc")loadEsc();}
+  ["queue","esc","new","sys"].forEach(x=>$("#tab-"+x).classList.toggle("hide",x!==t));
+  if(t==="queue")loadQueue(); if(t==="esc")loadEsc();
+  if(t==="sys"){const f=$("#sysFrame");if(f&&!f.src)f.src=f.dataset.src;}}
 document.querySelectorAll(".navbtn").forEach(b=>b.onclick=()=>activate(b.dataset.tab));
 document.querySelectorAll(".filterchip").forEach(b=>b.onclick=()=>{FILTER=b.dataset.f;
   document.querySelectorAll(".filterchip").forEach(x=>{x.classList.toggle("active",x===b);x.classList.toggle("crit",x===b&&b.dataset.f==="escalated")});
@@ -260,11 +302,17 @@ async function openCase(id){
           <div class="chips">${flags.map(f=>`<span class="chip risk">⚠ ${esc(f)}</span>`).join("")||'<span class="chip ok">✓ no risk flags</span>'}</div></div>
         <div class="card"><h3>Resolution ${sent?'<span class="srcbadge nim">Sent ✓</span>':'<span class="srcbadge tpl">Pending approval</span>'}</h3>
           ${sent
-            ?`<div class="email"><div class="subj">${esc(c.finalSubject||c.draftSubject)}</div><div class="body">${esc(c.finalBody||c.draftBody)}</div></div>`
-            :`<label>Subject</label><input id="apSubj" type="text" value="${esc(c.draftSubject||"")}"/>
+            ?`<div class="email"><div class="subj">${esc(c.finalSubject||c.draftSubject)}</div><div class="body">${esc(c.finalBody||c.draftBody)}</div></div>
+              ${(d.followUps||[]).map(f=>`<div class="email" style="margin-top:10px;border-color:rgba(126,197,222,.35)"><div class="subj">↩ ${esc(f.subject)} <span style="color:var(--faint);font-weight:400;font-size:11px">· ${fmt(f.createdAt)}</span></div><div class="body">${esc(f.body)}</div></div>`).join("")}
+              <div style="font-size:11.5px;color:var(--faint);margin-top:10px">Sent messages are immutable. Need to correct or update? Send a follow-up — the customer sees the full thread.</div>
+              <label>Follow-up message</label>
+              <textarea id="fuBody" style="min-height:110px" placeholder="e.g. A correction to our earlier response, or an update on the investigation…"></textarea>
+              <button class="btn" id="fuSend" onclick="sendFollowUp('${esc(c.complaintId)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 4h16v12H7l-3 3z"/></svg>Send follow-up</button>`
+            :`${c.draftWarnings?`<div style="border:1px solid rgba(255,170,80,.5);background:rgba(255,170,80,.08);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:12.5px;line-height:1.6"><b style="color:#FFAA50">⚠ Grounding check flagged this draft — fix before sending:</b><br>${c.draftWarnings.split("\n").map(w=>"• "+esc(w)).join("<br>")}</div>`:""}
+              <label>Subject</label><input id="apSubj" type="text" value="${esc(c.draftSubject||"")}"/>
               <label>Reply — edit before sending</label>
               <textarea id="apBody" style="min-height:240px">${esc(c.draftBody||"")}</textarea>
-              <button class="btn" onclick="approveCase('${esc(c.complaintId)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>Approve &amp; send</button>`}</div>
+              <button class="btn" id="apSend" onclick="approveCase('${esc(c.complaintId)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>Approve &amp; send</button>`}</div>
         <div class="card full"><h3>Audit trail</h3><div class="tl">${tl||'<div class="empty">No events.</div>'}</div></div>
       </div>`;
     el.scrollIntoView({behavior:"smooth",block:"start"});
@@ -272,14 +320,45 @@ async function openCase(id){
   }catch(e){el.innerHTML=`<div class="card full" style="margin-top:18px"><div class="empty">${esc(e.message)}</div></div>`}
 }
 function closeWorkspace(){SELECTED=null;$("#workspace").innerHTML="";loadQueue()}
-async function approveCase(id){
-  const btn=event&&event.target.closest("button");if(btn){btn.disabled=true;btn.innerHTML='<span class="spin"></span> Sending…';}
+const AP_BTN_HTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>Approve &amp; send';
+async function approveCase(id,force){
+  const btn=$("#apSend");if(btn){btn.disabled=true;btn.innerHTML='<span class="spin"></span> Sending…';}
   const subj=($("#apSubj")||{}).value||"", body=($("#apBody")||{}).value||"";
   try{
-    const r=await apiFetch(api()+"/api/complaints/"+encodeURIComponent(id)+"/approve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subject:subj,body:body})});
+    const r=await apiFetch(api()+"/api/complaints/"+encodeURIComponent(id)+"/approve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subject:subj,body:body,force:!!force})});
+    if(r.status===422){
+      // The grounding check blocked the send (invented figures, placeholders, raw timestamps…)
+      const d=await r.json().catch(()=>({issues:["unknown issue"]}));
+      if(btn){btn.disabled=false;btn.innerHTML=AP_BTN_HTML;}
+      const msg="Send blocked — the grounding check found:\n\n• "+(d.issues||["unknown issue"]).join("\n• ")
+        +"\n\nFix the reply above (recommended), or press OK to send anyway. Overrides are recorded in the audit trail.";
+      if(confirm(msg))return approveCase(id,true);
+      return;
+    }
     if(!r.ok)throw new Error("HTTP "+r.status);
     await openCase(id); loadQueue();
-  }catch(e){alert("Approve failed: "+e.message);}
+  }catch(e){alert("Approve failed: "+e.message);
+    if(btn){btn.disabled=false;btn.innerHTML=AP_BTN_HTML;}}
+}
+
+async function sendFollowUp(id,force){
+  const btn=$("#fuSend"), body=($("#fuBody")||{}).value||"";
+  if(!body.trim()){($("#fuBody")||{}).focus&&$("#fuBody").focus();return;}
+  if(btn){btn.disabled=true;btn.innerHTML='<span class="spin"></span> Sending…';}
+  try{
+    const r=await apiFetch(api()+"/api/complaints/"+encodeURIComponent(id)+"/follow-up",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({body:body,force:!!force})});
+    if(r.status===422){
+      const d=await r.json().catch(()=>({issues:["unknown issue"]}));
+      if(btn){btn.disabled=false;btn.innerHTML='Send follow-up';}
+      const msg="Follow-up blocked — the grounding check found:\n\n• "+(d.issues||["unknown issue"]).join("\n• ")
+        +"\n\nFix the message (recommended), or press OK to send anyway. Overrides are recorded in the audit trail.";
+      if(confirm(msg))return sendFollowUp(id,true);
+      return;
+    }
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    await openCase(id);
+  }catch(e){alert("Follow-up failed: "+e.message);
+    if(btn){btn.disabled=false;btn.innerHTML='Send follow-up';}}
 }
 
 // ── escalations ──
@@ -337,6 +416,38 @@ $("#apiBase").addEventListener("change",()=>{checkStatus();loadQueue()});
 $("#apiKey").value=localStorage.getItem("aegisKey")||"";
 $("#apiKey").addEventListener("change",()=>{localStorage.setItem("aegisKey",$("#apiKey").value);loadQueue();});
 checkStatus();loadQueue();
+
+// ── ambient gold-dust background (skipped for reduced-motion) ──
+(()=>{
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+  const cv=document.getElementById("fx");if(!cv)return;
+  const x=cv.getContext("2d");let W,H,pts=[];
+  function size(){W=cv.width=innerWidth*devicePixelRatio;H=cv.height=innerHeight*devicePixelRatio;
+    cv.style.width=innerWidth+"px";cv.style.height=innerHeight+"px";}
+  addEventListener("resize",size);size();
+  const N=Math.min(70,Math.floor(innerWidth/22));
+  for(let i=0;i<N;i++)pts.push({x:Math.random()*W,y:Math.random()*H,r:(Math.random()*1.4+.5)*devicePixelRatio,
+    vx:(Math.random()-.5)*.12*devicePixelRatio,vy:(-Math.random()*.16-.04)*devicePixelRatio,a:Math.random()*.5+.15,ph:Math.random()*6});
+  function frame(t){
+    if(document.hidden){requestAnimationFrame(frame);return;}
+    x.clearRect(0,0,W,H);
+    for(const p of pts){
+      p.x+=p.vx;p.y+=p.vy;
+      if(p.y<-8){p.y=H+8;p.x=Math.random()*W}
+      if(p.x<-8)p.x=W+8;if(p.x>W+8)p.x=-8;
+      const tw=p.a*(0.6+0.4*Math.sin(t*.0012+p.ph));
+      x.beginPath();x.arc(p.x,p.y,p.r,0,7);x.fillStyle=`rgba(221,179,90,${tw})`;x.fill();
+    }
+    // faint constellation links
+    x.strokeStyle="rgba(221,179,90,.05)";x.lineWidth=devicePixelRatio;
+    for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){
+      const dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d2=dx*dx+dy*dy;
+      if(d2<(120*devicePixelRatio)**2){x.beginPath();x.moveTo(pts[i].x,pts[i].y);x.lineTo(pts[j].x,pts[j].y);x.stroke();}
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
 </script>
 </body>
 </html>

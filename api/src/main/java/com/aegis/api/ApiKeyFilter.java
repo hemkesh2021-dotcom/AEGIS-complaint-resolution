@@ -37,12 +37,15 @@ public class ApiKeyFilter extends OncePerRequestFilter {
 
     private final String apiKey;
     private final int intakePerMinute;
+    private final int statusPerMinute;
     private final ConcurrentHashMap<String, long[]> buckets = new ConcurrentHashMap<>();
 
     public ApiKeyFilter(@Value("${aegis.api-key:}") String apiKey,
-                        @Value("${aegis.intake-rate-per-minute:20}") int intakePerMinute) {
+                        @Value("${aegis.intake-rate-per-minute:20}") int intakePerMinute,
+                        @Value("${aegis.status-rate-per-minute:60}") int statusPerMinute) {
         this.apiKey = apiKey == null ? "" : apiKey.trim();
         this.intakePerMinute = intakePerMinute;
+        this.statusPerMinute = statusPerMinute;
     }
 
     @Override
@@ -63,7 +66,13 @@ public class ApiKeyFilter extends OncePerRequestFilter {
                         || path.startsWith("/actuator/health");
 
         if (publicPath) {
-            if (path.equals("/api/intake") && !allow(clientIp(req))) {
+            // Both public endpoints are rate-limited: intake (LLM-cost abuse) and
+            // status (tracking-token guessing / enumeration).
+            if (path.equals("/api/intake") && !allow("in:" + clientIp(req), intakePerMinute)) {
+                deny(res, 429, "{\"error\":\"rate limit exceeded\"}");
+                return;
+            }
+            if (path.startsWith("/api/status/") && !allow("st:" + clientIp(req), statusPerMinute)) {
                 deny(res, 429, "{\"error\":\"rate limit exceeded\"}");
                 return;
             }
@@ -85,16 +94,16 @@ public class ApiKeyFilter extends OncePerRequestFilter {
         chain.doFilter(req, res);
     }
 
-    private boolean allow(String ip) {
+    private boolean allow(String bucketKey, int perMinute) {
         long now = System.currentTimeMillis();
-        long[] b = buckets.computeIfAbsent(ip, k -> new long[]{now, 0});
+        long[] b = buckets.computeIfAbsent(bucketKey, k -> new long[]{now, 0});
         synchronized (b) {
             if (now - b[0] > 60_000L) {
                 b[0] = now;
                 b[1] = 0;
             }
             b[1]++;
-            return b[1] <= intakePerMinute;
+            return b[1] <= perMinute;
         }
     }
 

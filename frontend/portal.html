@@ -4,13 +4,17 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Lodge a Complaint · AEGIS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{--bg:#0C0A08;--bg2:#0A0806;--surface:rgba(255,250,240,.05);--border:rgba(240,207,142,.14);
     --border-strong:rgba(240,207,142,.28);--text:#F2EDE4;--muted:#9A917F;--faint:#6E665A;
     --gold:#DDB35A;--gold-2:#B8862F;--gold-hi:#F0CF8E;--on-gold:#2A1C04;--ok:#5BBF92;--info:#7EC5DE}
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;line-height:1.55}
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;line-height:1.55}
+  .brand,h2,.ref{font-family:'Space Grotesk','Inter',system-ui,sans-serif;letter-spacing:.01em}
   body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
     background:radial-gradient(600px 400px at 15% -10%,rgba(221,179,90,.22),transparent 60%),
     radial-gradient(600px 500px at 110% 110%,rgba(184,134,47,.18),transparent 60%)}
@@ -56,9 +60,29 @@
   .livedot{width:7px;height:7px;border-radius:50%;background:var(--gold);animation:blink 1.4s infinite}
   @keyframes blink{50%{opacity:.3}}
   .note{font-size:12px;color:var(--faint);margin-top:14px;text-align:center}.note a{color:var(--muted)}
+
+  /* ── elevation layer ─────────────────────────────────────────── */
+  #fx{position:fixed;inset:0;z-index:0;pointer-events:none}
+  body::before{animation:drift 28s ease-in-out infinite alternate}
+  @keyframes drift{from{transform:translate(0,0) scale(1)}to{transform:translate(50px,35px) scale(1.12)}}
+  .card{transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease}
+  .card:hover{transform:translateY(-2px);border-color:var(--border-strong);
+    box-shadow:0 16px 55px rgba(8,5,2,.6),0 0 34px -12px rgba(221,179,90,.35)}
+  .btn{position:relative;overflow:hidden}
+  .btn::after{content:"";position:absolute;top:0;left:-80%;width:50%;height:100%;transform:skewX(-22deg);
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);transition:left .5s ease;pointer-events:none}
+  .btn:hover::after{left:130%}
+  .btn:active{transform:scale(.985)}
+  .brand .mark{animation:markGlow 3.6s ease-in-out infinite}
+  @keyframes markGlow{0%,100%{box-shadow:0 4px 16px rgba(221,179,90,.35)}50%{box-shadow:0 4px 28px rgba(221,179,90,.65)}}
+  ::-webkit-scrollbar{width:9px}
+  ::-webkit-scrollbar-thumb{background:rgba(240,207,142,.18);border-radius:6px;border:2px solid var(--bg)}
+  ::-webkit-scrollbar-track{background:transparent}
+  @media (prefers-reduced-motion: reduce){body::before,.brand .mark{animation:none}.card,.btn::after{transition:none}#fx{display:none}}
 </style>
 </head>
 <body>
+<canvas id="fx" aria-hidden="true"></canvas>
 <div class="wrap">
   <div class="brand"><span class="mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2A1C04" stroke-width="2.2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/></svg></span>AEGIS</div>
   <p class="sub">Customer complaint portal — lodge a complaint and track its progress.</p>
@@ -80,15 +104,15 @@
 
   <div class="card">
     <h2>Track a complaint</h2>
-    <p class="hint">Already have a reference number? Check its status and read our response.</p>
+    <p class="hint">Already have a tracking code? Check your complaint's status and read our response.</p>
     <div class="row">
-      <div><label>Reference number</label><input id="trackId" placeholder="CMP-…"/></div>
+      <div><label>Tracking code</label><input id="trackId" placeholder="TRK-…"/></div>
       <div style="flex:none"><button class="btn ghost" style="margin:0" onclick="track()">Check status</button></div>
     </div>
     <div id="trackWrap"></div>
   </div>
 
-  <p class="note">Staff view: <a href="index.html">operator console →</a></p>
+  <p class="note">Staff view: <a href="index.html">operator console →</a> &nbsp;·&nbsp; <a href="architecture.html">explore the system in 3D →</a></p>
 </div>
 
 <script>
@@ -99,14 +123,17 @@ function fmt(iso){if(!iso)return"—";const d=new Date(iso);if(isNaN(d))return e
   return d.toLocaleString("en-US",{month:"long",day:"numeric",year:"numeric",hour:"2-digit",minute:"2-digit"})}
 function statusPill(s,label){return s==="SENT"?`<span class="pill done">✓ ${esc(label||"Responded")}</span>`:`<span class="pill rev">${esc(label||"Under review")}</span>`}
 
-// The response the customer receives — summary + the full reply "email".
-function replyHTML(reply){
+// The response the customer receives — summary + the full reply "email" + any follow-ups.
+function replyHTML(reply,followUps){
   if(!reply||!reply.body)return"";
+  const thread=(followUps||[]).map(f=>`<div class="email" style="margin-top:12px;border-color:rgba(126,197,222,.35)">
+    <div class="subj">Update from our team <span style="color:var(--faint);font-weight:400;font-size:11.5px">· ${fmt(f.sentAt)}</span></div>
+    <div class="body">${esc(f.body)}</div></div>`).join("");
   return `<div class="card fade" style="border-color:rgba(91,191,146,.4)">
     <h2 style="color:var(--ok)">✓ We've responded to your complaint</h2>
     <p class="hint">A specialist has reviewed and answered your complaint. Here's a quick summary, followed by the full message.</p>
     ${reply.summary?`<div class="summary"><div class="lbl">Summary</div>${esc(reply.summary)}</div>`:""}
-    <div class="email"><div class="subj">${esc(reply.subject)||"Response to your complaint"}</div><div class="body">${esc(reply.body)}</div></div></div>`;
+    <div class="email"><div class="subj">${esc(reply.subject)||"Response to your complaint"}</div><div class="body">${esc(reply.body)}</div></div>${thread}</div>`;
 }
 
 async function lodge(){
@@ -123,12 +150,13 @@ async function lodge(){
       <div class="ref">${esc(d.complaintId)}</div>
       <p style="font-size:13.5px;margin:12px 0 14px">${esc(d.message)}</p>
       <div class="kv"><span class="k">Status</span><span id="liveStatus">${statusPill(d.status,d.statusLabel)}</span></div>
+      <div class="kv"><span class="k">Tracking code</span><span style="font-family:ui-monospace,monospace;font-size:12px;color:var(--gold-hi);word-break:break-all">${esc(d.trackingToken)}</span></div>
       <div class="kv"><span class="k">Acknowledged by</span><span>${fmt(d.ackDue)}</span></div>
       <div class="kv"><span class="k">We'll respond by</span><span><b>${fmt(d.resolutionDue)}</b></span></div>
       <div class="live"><span class="livedot"></span> This page updates automatically when a specialist responds. <a onclick="pollOnce(pollId)" style="color:var(--gold-hi);cursor:pointer;margin-left:2px">Check now</a></div>
     </div></div><div id="respWrap"></div>`;
-    $("#trackId").value=d.complaintId;
-    startPoll(d.complaintId);
+    $("#trackId").value=d.trackingToken;
+    startPoll(d.trackingToken);
   }catch(e){$("#ackWrap").innerHTML=`<div class="card"><div class="hint">Sorry, we couldn't submit that (${esc(e.message)}). Please try again shortly.</div></div>`}
   finally{b.disabled=false;b.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12H7l-3 3z"/></svg>Submit complaint';}
 }
@@ -141,7 +169,7 @@ async function pollOnce(id){
   try{
     const d=await (await fetch(api()+"/api/status/"+encodeURIComponent(id))).json();
     const ls=$("#liveStatus");if(ls)ls.innerHTML=statusPill(d.status,d.statusLabel);
-    if(d.reply){const rw=$("#respWrap");if(rw)rw.innerHTML=replyHTML(d.reply);
+    if(d.reply){const rw=$("#respWrap");if(rw)rw.innerHTML=replyHTML(d.reply,d.followUps);
       const live=document.querySelector(".live");if(live)live.remove();
       pollId=null;stopPoll();}
   }catch(e){}
@@ -159,7 +187,7 @@ async function track(){
   const w=$("#trackWrap");w.innerHTML='<p class="hint" style="margin-top:14px">Checking…</p>';
   try{
     const r=await fetch(api()+"/api/status/"+encodeURIComponent(id));
-    if(r.status===404){w.innerHTML='<p class="hint" style="margin-top:14px">No complaint found with that reference.</p>';return;}
+    if(r.status===404){w.innerHTML='<p class="hint" style="margin-top:14px">No complaint found with that tracking code. Use the full code from your acknowledgement (it starts with TRK-).</p>';return;}
     if(!r.ok)throw new Error("HTTP "+r.status);
     const d=await r.json();
     w.innerHTML=`<div class="ack fade" style="margin-top:16px;border-color:var(--border);background:var(--bg2)">
@@ -167,9 +195,40 @@ async function track(){
       <div class="kv" style="margin-top:8px"><span class="k">Status</span><span>${statusPill(d.status,d.statusLabel)}</span></div>
       <div class="kv"><span class="k">Category</span><span>${esc(d.category)||"—"}</span></div>
       <div class="kv"><span class="k">We'll respond by</span><span><b>${fmt(d.resolutionDue)}</b></span></div></div>
-      ${replyHTML(d.reply)}`;
+      ${replyHTML(d.reply,d.followUps)}`;
   }catch(e){w.innerHTML=`<p class="hint" style="margin-top:14px">Couldn't check status (${esc(e.message)}).</p>`}
 }
+
+// ── ambient gold-dust background (skipped for reduced-motion) ──
+(()=>{
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+  const cv=document.getElementById("fx");if(!cv)return;
+  const x=cv.getContext("2d");let W,H,pts=[];
+  function size(){W=cv.width=innerWidth*devicePixelRatio;H=cv.height=innerHeight*devicePixelRatio;
+    cv.style.width=innerWidth+"px";cv.style.height=innerHeight+"px";}
+  addEventListener("resize",size);size();
+  const N=Math.min(60,Math.floor(innerWidth/24));
+  for(let i=0;i<N;i++)pts.push({x:Math.random()*W,y:Math.random()*H,r:(Math.random()*1.4+.5)*devicePixelRatio,
+    vx:(Math.random()-.5)*.12*devicePixelRatio,vy:(-Math.random()*.16-.04)*devicePixelRatio,a:Math.random()*.5+.15,ph:Math.random()*6});
+  function frame(t){
+    if(document.hidden){requestAnimationFrame(frame);return;}
+    x.clearRect(0,0,W,H);
+    for(const p of pts){
+      p.x+=p.vx;p.y+=p.vy;
+      if(p.y<-8){p.y=H+8;p.x=Math.random()*W}
+      if(p.x<-8)p.x=W+8;if(p.x>W+8)p.x=-8;
+      const tw=p.a*(0.6+0.4*Math.sin(t*.0012+p.ph));
+      x.beginPath();x.arc(p.x,p.y,p.r,0,7);x.fillStyle=`rgba(221,179,90,${tw})`;x.fill();
+    }
+    x.strokeStyle="rgba(221,179,90,.05)";x.lineWidth=devicePixelRatio;
+    for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){
+      const dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y;
+      if(dx*dx+dy*dy<(120*devicePixelRatio)**2){x.beginPath();x.moveTo(pts[i].x,pts[i].y);x.lineTo(pts[j].x,pts[j].y);x.stroke();}
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
 </script>
 </body>
 </html>

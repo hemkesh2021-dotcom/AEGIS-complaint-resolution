@@ -2,6 +2,7 @@ package com.aegis.api;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * AEGIS v2 orchestrator entry point.
@@ -11,6 +12,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * audit. Only the classifier is a learned model; the rest is explainable logic.
  */
 @SpringBootApplication
+@EnableScheduling
 public class AegisApiApplication {
 
     public static void main(String[] args) {
