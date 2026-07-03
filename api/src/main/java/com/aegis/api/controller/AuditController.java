@@ -120,7 +120,16 @@ public class AuditController {
             c.setFinalBody(body);
             c.setFinalSummary(drafting.summarize(body, c.getCustomerName()));
             c.setStatus("SENT");
+            // Learning loop — every approval is implicit feedback on the AI draft.
+            boolean edited = !nzs(body).equals(nzs(c.getDraftBody()))
+                    || !nzs(subject).equals(nzs(c.getDraftSubject()));
+            double sim = edited ? com.aegis.api.service.EditSignal.similarity(c.getDraftBody(), body) : 1.0;
+            c.setOperatorEdited(edited);
+            c.setEditSimilarity(sim);
             cases.save(c);
+            events.save(new AuditEvent(id, "learning", edited
+                    ? String.format("operator edited the draft before sending (similarity %.2f) — captured for retraining", sim)
+                    : "draft sent unedited — positive training signal"));
             events.save(new AuditEvent(id, "approved", issues.isEmpty()
                     ? "CS reviewed, approved, and sent the reply"
                     : "CS sent with OVERRIDE despite grounding issues: " + String.join(" | ", issues)));
@@ -173,6 +182,35 @@ public class AuditController {
             caseEvents.publish(c.getTrackingToken(), "update");
             return ResponseEntity.ok((Object) m);
         }).orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * The learning-loop export: every approved case as a labeled example —
+     * (complaint, category, AI draft, human-approved final, edit signal).
+     * Feed it to fine-tuning/prompt-tuning jobs; unedited sends are positive
+     * labels, heavy rewrites show exactly where the drafts fall short.
+     */
+    @GetMapping("/training-data")
+    public List<Map<String, Object>> trainingData() {
+        return cases.findByStatusOrderByCreatedAtDesc("SENT").stream().map(c -> {
+            Map<String, Object> m = new java.util.LinkedHashMap<String, Object>();
+            m.put("complaintId", c.getComplaintId());
+            m.put("category", c.getCategory());
+            m.put("confidence", c.getConfidence());
+            m.put("complaintText", c.getComplaintText());
+            m.put("draftBody", c.getDraftBody());
+            m.put("finalBody", c.getFinalBody());
+            m.put("operatorEdited", c.getOperatorEdited());
+            m.put("editSimilarity", c.getEditSimilarity());
+            m.put("escalated", c.isEscalate());
+            m.put("urgency", c.getUrgency());
+            m.put("riskFlags", c.getRiskFlags());
+            return m;
+        }).toList();
+    }
+
+    private static String nzs(String s) {
+        return s == null ? "" : s;
     }
 
     private String retrievedContext(String complaintText) {

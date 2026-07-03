@@ -65,6 +65,11 @@ public class CaseRecord {
     @Column(columnDefinition = "text")
     private String finalSummary;
 
+    /** Learning loop: did the operator change the AI draft, and by how much?
+     *  Nullable on purpose — cases sent before this feature carry no signal. */
+    private Boolean operatorEdited;
+    private Double editSimilarity; // 1.0 = sent unchanged … 0.0 = fully rewritten
+
     private Instant createdAt;
 
     public CaseRecord() {
@@ -141,4 +146,10 @@ public class CaseRecord {
 
     public String getFinalSummary() { return finalSummary; }
     public void setFinalSummary(String v) { this.finalSummary = v; }
+
+    public Boolean getOperatorEdited() { return operatorEdited; }
+    public void setOperatorEdited(Boolean v) { this.operatorEdited = v; }
+
+    public Double getEditSimilarity() { return editSimilarity; }
+    public void setEditSimilarity(Double v) { this.editSimilarity = v; }
 }

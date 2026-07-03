@@ -14,5 +14,7 @@ public interface CaseRepository extends JpaRepository<CaseRecord, String> {
 
     Optional<CaseRecord> findByTrackingToken(String trackingToken);
 
+    List<CaseRecord> findByStatusOrderByCreatedAtDesc(String status);
+
     long deleteByCreatedAtBefore(Instant cutoff);
 }

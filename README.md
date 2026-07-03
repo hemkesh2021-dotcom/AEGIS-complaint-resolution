@@ -66,6 +66,7 @@ Without a NIM key the pipeline still runs end to end — drafts come from the de
 - `GET /api/complaints` · `GET /api/complaints/{id}` · `GET /api/escalations` — queue, case + audit trail + thread, escalations
 - `POST /api/complaints/{id}/approve` — verify + send; `422` with issues if the grounding check fails (`force: true` to override, audited); `409` once sent
 - `POST /api/complaints/{id}/follow-up` — append a verified correction/update to a sent case
+- `GET /api/training-data` — **learning-loop export**: every approved case as a labeled example (complaint, AI draft, human-approved final, edit-similarity signal) ready for retraining
 - `POST /api/eval` — fast, side-effect-free scoring endpoint for the eval harness
 
 ## Evaluation
@@ -133,7 +134,7 @@ Deploys the classifier (private) and the API (public, wired to the classifier UR
 
 ## Roadmap
 
-OAuth2/OIDC with operator roles + maker-checker approval · inbound email intake · operator-feedback learning loop (edits → retraining data) · hybrid retrieval (BM25 + reranker) with citation-pinned drafts · multilingual intake · case-intelligence dashboard · k6 load-test benchmarks.
+OAuth2/OIDC with operator roles + maker-checker approval · inbound email intake · hybrid retrieval (BM25 + reranker) with citation-pinned drafts · periodic retraining job over `/api/training-data` · multilingual intake · case-intelligence dashboard · k6 load-test benchmarks.
 
 ## Contributing
 

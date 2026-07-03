@@ -303,7 +303,8 @@ async function openCase(id){
           <div class="chips">${flags.map(f=>`<span class="chip risk">⚠ ${esc(f)}</span>`).join("")||'<span class="chip ok">✓ no risk flags</span>'}</div></div>
         <div class="card"><h3>Resolution ${sent?'<span class="srcbadge nim">Sent ✓</span>':'<span class="srcbadge tpl">Pending approval</span>'}</h3>
           ${sent
-            ?`<div class="email"><div class="subj">${esc(c.finalSubject||c.draftSubject)}</div><div class="body">${esc(c.finalBody||c.draftBody)}</div></div>
+            ?`${c.operatorEdited===true?`<div style="font-size:11.5px;color:var(--warn);margin-bottom:10px">✎ Operator edited the AI draft before sending${typeof c.editSimilarity==="number"?` — similarity ${Math.round(c.editSimilarity*100)}%`:""} · captured for retraining</div>`:(c.operatorEdited===false?`<div style="font-size:11.5px;color:var(--ok);margin-bottom:10px">✓ AI draft sent unedited — positive training signal</div>`:"")}
+              <div class="email"><div class="subj">${esc(c.finalSubject||c.draftSubject)}</div><div class="body">${esc(c.finalBody||c.draftBody)}</div></div>
               ${(d.followUps||[]).map(f=>`<div class="email" style="margin-top:10px;border-color:rgba(126,197,222,.35)"><div class="subj">↩ ${esc(f.subject)} <span style="color:var(--faint);font-weight:400;font-size:11px">· ${fmt(f.createdAt)}</span></div><div class="body">${esc(f.body)}</div></div>`).join("")}
               <div style="font-size:11.5px;color:var(--faint);margin-top:10px">Sent messages are immutable. Need to correct or update? Send a follow-up — the customer sees the full thread.</div>
               <label>Follow-up message</label>
