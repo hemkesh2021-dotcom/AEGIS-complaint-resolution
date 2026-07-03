@@ -38,8 +38,11 @@ services:
 
   # Local mail catcher — every customer email lands in the inbox at http://localhost:8025
   # (Mailpit: maintained MailHog successor, native arm64 + amd64)
+  # AEGIS Mail (frontend/inbox.html) reads Mailpit's REST API — hence the CORS origin.
   mailhog:
     image: axllent/mailpit
+    environment:
+      MP_API_CORS: http://localhost:8088
     ports:
       - "8025:8025"
 

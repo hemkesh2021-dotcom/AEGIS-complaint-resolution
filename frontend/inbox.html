@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AEGIS Mail</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ── minimal ink-on-paper palette · one whisper of gold ── */
+  :root{
+    --paper:#F7F5F0;--paper2:#EFECE4;--paper3:#E9E5DB;
+    --ink:#17150F;--ink2:#45413A;--mute:#9B958A;--faint:#C2BCAF;
+    --hair:#E4E0D5;--hair2:#D6D1C3;
+    --accent:#B8862F;
+    --shadow-lg:0 30px 80px -20px rgba(23,21,15,.25),0 8px 24px -12px rgba(23,21,15,.12);
+    --shadow-md:0 10px 30px -12px rgba(23,21,15,.18);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--paper);color:var(--ink);overflow:hidden;
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif}
+
+  /* graphics layer: drifting monochrome mesh + film grain */
+  .mesh{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .mesh i{position:absolute;border-radius:50%;filter:blur(90px)}
+  .mesh i:nth-child(1){width:640px;height:640px;left:-200px;top:-220px;background:rgba(23,21,15,.06);animation:m1 30s ease-in-out infinite alternate}
+  .mesh i:nth-child(2){width:720px;height:720px;right:-260px;bottom:-280px;background:rgba(184,134,47,.07);animation:m2 36s ease-in-out infinite alternate}
+  .mesh i:nth-child(3){width:420px;height:420px;left:42%;top:58%;background:rgba(23,21,15,.04);animation:m1 24s 2s ease-in-out infinite alternate-reverse}
+  @keyframes m1{to{transform:translate(70px,50px) scale(1.12)}}
+  @keyframes m2{to{transform:translate(-80px,-60px) scale(1.08)}}
+  .grain{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.05;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")}
+
+  .app{position:relative;z-index:1;display:grid;grid-template-columns:250px 400px 1fr;height:100vh}
+
+  /* ── rail ── */
+  .rail{border-right:1px solid var(--hair);padding:26px 18px 18px;display:flex;flex-direction:column;gap:4px}
+  .brand{display:flex;align-items:center;gap:12px;padding:0 8px 22px}
+  .brand .mark{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex:none;
+    background:var(--ink);box-shadow:var(--shadow-md);transition:transform .3s cubic-bezier(.2,.8,.2,1)}
+  .brand:hover .mark{transform:rotate(-6deg) scale(1.05)}
+  .brand .t{font:700 19px 'Space Grotesk';letter-spacing:.02em;line-height:1}
+  .brand small{display:block;font:600 9px 'Inter';color:var(--mute);letter-spacing:.34em;margin-top:4px}
+  .folder{display:flex;align-items:center;gap:11px;padding:10px 13px;border-radius:12px;cursor:pointer;
+    color:var(--ink2);font:500 13.5px 'Inter';border:1px solid transparent;transition:.18s;background:none;text-align:left;width:100%}
+  .folder:hover{background:var(--paper2)}
+  .folder.active{background:var(--ink);color:var(--paper);box-shadow:var(--shadow-md)}
+  .folder.active .glyph{color:var(--paper)}
+  .folder .glyph{font:400 13px 'Space Grotesk';color:var(--mute);width:14px;text-align:center;transition:.18s}
+  .folder .cnt{margin-left:auto;font:600 11px 'Space Grotesk';font-variant-numeric:tabular-nums;color:inherit;opacity:.55}
+  .rail .spacer{flex:1}
+  .rail .links{border-top:1px solid var(--hair);padding-top:14px;display:flex;flex-direction:column;gap:1px}
+  .rail .links a{color:var(--mute);font:400 12px 'Inter';text-decoration:none;padding:6px 13px;border-radius:8px;transition:.15s}
+  .rail .links a:hover{color:var(--ink);background:var(--paper2)}
+  .cfg{font:400 10.5px 'Inter';color:var(--faint);padding:10px 13px 0}
+  .cfg input{width:100%;margin-top:4px;background:#fff;border:1px solid var(--hair);color:var(--ink2);
+    border-radius:8px;padding:6px 9px;font:400 10.5px 'Inter'}
+  .cfg input:focus{outline:none;border-color:var(--hair2)}
+
+  /* ── list ── */
+  .list{border-right:1px solid var(--hair);display:flex;flex-direction:column;min-width:0;position:relative}
+  .listhead{padding:26px 24px 6px;position:relative}
+  .bignum{position:absolute;right:18px;top:2px;font:700 92px 'Space Grotesk';color:var(--ink);opacity:.045;
+    line-height:1;pointer-events:none;font-variant-numeric:tabular-nums}
+  .listhead h1{margin:0;font:700 30px 'Space Grotesk';letter-spacing:-.01em}
+  .listhead .sub{font:400 12px 'Inter';color:var(--mute);display:flex;align-items:center;gap:8px;margin-top:4px}
+  .livedot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:blink 2s infinite}
+  @keyframes blink{50%{opacity:.25}}
+  .search{margin:16px 20px 10px;position:relative}
+  .search input{width:100%;background:#fff;border:1px solid var(--hair);color:var(--ink);
+    border-radius:14px;padding:11px 14px 11px 38px;font:400 13px 'Inter';transition:.2s;box-shadow:0 1px 2px rgba(23,21,15,.03)}
+  .search input:focus{outline:none;border-color:var(--ink);box-shadow:var(--shadow-md)}
+  .search svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--mute)}
+  .msgs{flex:1;overflow-y:auto;padding:6px 14px 24px}
+  .msg{display:flex;gap:13px;padding:14px 13px;border-radius:16px;cursor:pointer;border:1px solid transparent;
+    transition:transform .2s cubic-bezier(.2,.8,.2,1),box-shadow .2s,background .2s,border-color .2s;
+    animation:in .4s cubic-bezier(.2,.8,.2,1) both;position:relative;background:transparent}
+  @keyframes in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .msg:hover{background:#fff;border-color:var(--hair);transform:translateY(-1px);box-shadow:var(--shadow-md)}
+  .msg.sel{background:#fff;border-color:var(--ink);box-shadow:var(--shadow-md)}
+  .av{width:42px;height:42px;border-radius:14px;flex:none;display:grid;place-items:center;
+    font:600 16px 'Space Grotesk';color:var(--paper);background:var(--ink);transition:.25s}
+  .msg.read .av{background:var(--paper3);color:var(--ink2)}
+  .msg .body{min-width:0;flex:1}
+  .msg .r1{display:flex;align-items:center;gap:8px}
+  .msg .from{font:600 13px 'Inter';white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .msg .time{margin-left:auto;font:400 10.5px 'Inter';color:var(--mute);flex:none;font-variant-numeric:tabular-nums}
+  .msg .subj{font:500 12.5px 'Inter';color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:3px 0 2px}
+  .msg .snip{font:400 11.5px 'Inter';color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .msg .meta{display:flex;gap:6px;margin-top:7px;align-items:center}
+  .tag{font:600 8.5px 'Inter';letter-spacing:.12em;text-transform:uppercase;border-radius:10px;padding:3px 9px;
+    color:var(--ink2);border:1px solid var(--hair2);background:transparent}
+  .tag .g{font-family:'Space Grotesk';margin-right:4px}
+  .ref{font:500 9.5px ui-monospace,monospace;color:var(--mute);background:var(--paper2);
+    border-radius:8px;padding:2.5px 8px;letter-spacing:.02em}
+  .msg .unread{position:absolute;left:2px;top:50%;transform:translateY(-50%);width:3px;height:26px;
+    border-radius:3px;background:var(--ink)}
+  .msg.read .from{font-weight:400;color:var(--ink2)}
+  .msg.read .subj{color:var(--mute)}
+  .empty{color:var(--mute);font:400 13px 'Inter';text-align:center;padding:48px 28px;line-height:1.8}
+  .empty b{color:var(--ink2)}
+  .empty svg{display:block;margin:0 auto 18px;color:var(--hair2)}
+  .empty .draw{stroke-dasharray:300;stroke-dashoffset:300;animation:draw 2.2s ease forwards}
+  @keyframes draw{to{stroke-dashoffset:0}}
+
+  /* ── reading pane ── */
+  .reader{display:flex;flex-direction:column;min-width:0}
+  .rhead{padding:28px 34px 18px;animation:in .3s ease both}
+  .rhead .subj{font:700 22px/1.3 'Space Grotesk';letter-spacing:-.01em;margin:0 0 14px}
+  .rhead .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .rhead .who{font:400 12.5px 'Inter';color:var(--mute)}
+  .rhead .who b{color:var(--ink);font-weight:600}
+  .rhead .when{font:400 11.5px 'Inter';color:var(--mute);margin-left:auto;font-variant-numeric:tabular-nums}
+  .actions{display:flex;gap:8px;margin-top:16px}
+  .abtn{font:500 12px 'Inter';color:var(--ink2);border:1px solid var(--hair2);background:#fff;
+    border-radius:20px;padding:7px 16px;cursor:pointer;transition:.18s}
+  .abtn:hover{border-color:var(--ink);color:var(--ink);transform:translateY(-1px);box-shadow:var(--shadow-md)}
+  .abtn.del:hover{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .rbody{flex:1;overflow:hidden;padding:6px 34px 30px}
+  .rbody .paper{height:100%;border-radius:20px;overflow:hidden;background:#fff;
+    box-shadow:var(--shadow-lg);border:1px solid var(--hair);animation:paper .45s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes paper{from{opacity:0;transform:translateY(18px) scale(.99)}to{opacity:1;transform:none}}
+  .rbody iframe{width:100%;height:100%;border:0;display:block;background:#fff}
+  .rbody pre{margin:0;height:100%;overflow:auto;padding:30px;font:400 13.5px/1.75 ui-monospace,monospace;color:var(--ink2);white-space:pre-wrap}
+  .zero{flex:1;display:grid;place-items:center;color:var(--mute);font:400 13.5px 'Inter';text-align:center;line-height:1.9;padding:20px}
+  .zero .art{margin-bottom:22px}
+  .zero .art svg{color:var(--hair2)}
+  .zero .art .draw{stroke-dasharray:420;stroke-dashoffset:420;animation:draw 2.6s .3s ease forwards}
+  .zero .big{font:700 40px 'Space Grotesk';letter-spacing:-.02em;color:var(--ink);margin-bottom:8px}
+  .zero .big em{font-style:normal;color:var(--accent)}
+  .toast{position:fixed;z-index:9;bottom:28px;right:28px;background:var(--ink);color:var(--paper);
+    border-radius:16px;padding:13px 20px;font:500 12.5px 'Inter';box-shadow:var(--shadow-lg);
+    display:none;animation:toast .45s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes toast{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+  ::-webkit-scrollbar{width:10px}
+  ::-webkit-scrollbar-thumb{background:var(--hair2);border-radius:6px;border:3px solid var(--paper)}
+  ::-webkit-scrollbar-thumb:hover{background:var(--mute)}
+  ::-webkit-scrollbar-track{background:transparent}
+  @media(max-width:1000px){.app{grid-template-columns:210px 1fr}.reader{position:fixed;inset:0;z-index:8;background:var(--paper);display:none}
+    .reader.open{display:flex}}
+  @media (prefers-reduced-motion: reduce){*{animation-duration:.01s!important}}
+</style>
+</head>
+<body>
+<div class="mesh"><i></i><i></i><i></i></div>
+<div class="grain"></div>
+<div class="app">
+
+  <aside class="rail">
+    <div class="brand"><span class="mark"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#F7F5F0" stroke-width="2"><path d="M3 7l9 6 9-6M4 5h16a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1z"/></svg></span><span class="t">AEGIS<small>M A I L</small></span></div>
+    <button class="folder active" data-f="all"><span class="glyph">◈</span>Inbox<span class="cnt" id="cAll">0</span></button>
+    <button class="folder" data-f="ack"><span class="glyph">○</span>Acknowledgements<span class="cnt" id="cAck">0</span></button>
+    <button class="folder" data-f="resp"><span class="glyph">●</span>Responses<span class="cnt" id="cResp">0</span></button>
+    <button class="folder" data-f="upd"><span class="glyph">◐</span>Updates<span class="cnt" id="cUpd">0</span></button>
+    <div class="spacer"></div>
+    <div class="links">
+      <a href="portal.html">Customer portal →</a>
+      <a href="index.html">Operator console →</a>
+      <a href="architecture.html">3D architecture →</a>
+      <a id="mailpitLink" href="http://localhost:8025" target="_blank">Raw catcher (Mailpit) ↗</a>
+    </div>
+    <div class="cfg">Mail API endpoint<input id="mailBase" value="http://localhost:8025"/></div>
+  </aside>
+
+  <section class="list">
+    <div class="listhead">
+      <div class="bignum" id="bignum">0</div>
+      <h1>Inbox</h1>
+      <div class="sub"><span class="livedot"></span><span id="liveTxt">live — checking for new mail…</span></div>
+    </div>
+    <div class="search">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input id="q" placeholder="Search subject, sender, snippet…"/>
+    </div>
+    <div class="msgs" id="msgs"><div class="empty">Connecting to the mail catcher…</div></div>
+  </section>
+
+  <section class="reader" id="reader">
+    <div class="zero" id="zero"><div>
+      <div class="art"><svg width="120" height="90" viewBox="0 0 120 90" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect class="draw" x="8" y="12" width="104" height="66" rx="10"/>
+        <path class="draw" d="M10 18l50 36 50-36" stroke-linecap="round"/>
+      </svg></div>
+      <div class="big">AEGIS <em>Mail</em></div>
+      Select a message to read it here.<br>
+      Every customer email your system sends — acknowledgements,<br>responses, and follow-ups — arrives in this inbox.
+    </div></div>
+    <div class="rhead" id="rhead" style="display:none"></div>
+    <div class="rbody" id="rbody" style="display:none"></div>
+  </section>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const base=()=>$("#mailBase").value.replace(/\/$/,"");
+let MSGS=[],SEL=null,FOLDER="all",QUERY="",knownIds=new Set(),firstLoad=true;
+
+function esc(s){return (s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function typeOf(m){
+  const s=(m.Subject||"").toLowerCase();
+  if(s.includes("we received")||s.includes("received your"))return"ack";
+  if(s.startsWith("update")||s.includes("update on"))return"upd";
+  return"resp";
+}
+const TYPE_LABEL={ack:"Acknowledged",resp:"Response",upd:"Update"};
+const TYPE_GLYPH={ack:"○",resp:"●",upd:"◐"};
+function refOf(m){const x=((m.Subject||"")+" "+(m.Snippet||"")).match(/CMP-[A-Z0-9-]{4,}/i);return x?x[0].toUpperCase():null}
+function rel(iso){
+  const d=new Date(iso),s=(Date.now()-d)/1000;
+  if(isNaN(d))return"";
+  if(s<60)return"just now";if(s<3600)return Math.floor(s/60)+"m ago";
+  if(s<86400)return Math.floor(s/3600)+"h ago";
+  if(s<172800)return"yesterday";
+  return d.toLocaleDateString("en-US",{month:"short",day:"numeric"});
+}
+function fullTime(iso){const d=new Date(iso);return isNaN(d)?"":d.toLocaleString("en-US",{weekday:"short",month:"long",day:"numeric",year:"numeric",hour:"2-digit",minute:"2-digit"})}
+function initialOf(m){const n=(m.From&&(m.From.Name||m.From.Address))||"A";return n.trim()[0].toUpperCase()}
+
+/* ── list rendering ── */
+function counts(){
+  const c={all:MSGS.length,ack:0,resp:0,upd:0};
+  MSGS.forEach(m=>c[typeOf(m)]++);
+  $("#cAll").textContent=c.all;$("#cAck").textContent=c.ack;$("#cResp").textContent=c.resp;$("#cUpd").textContent=c.upd;
+  $("#bignum").textContent=c.all;
+}
+function renderList(){
+  counts();
+  const q=QUERY.toLowerCase();
+  const rows=MSGS.filter(m=>FOLDER==="all"||typeOf(m)===FOLDER)
+    .filter(m=>!q||((m.Subject||"")+(m.Snippet||"")+((m.From&&m.From.Name)||"")).toLowerCase().includes(q));
+  const el=$("#msgs");
+  if(!rows.length){el.innerHTML='<div class="empty"><svg width="84" height="64" viewBox="0 0 120 90" fill="none" stroke="currentColor" stroke-width="1.5"><rect class="draw" x="8" y="12" width="104" height="66" rx="10"/><path class="draw" d="M10 18l50 36 50-36" stroke-linecap="round"/></svg><b>Nothing here yet.</b><br>Lodge a complaint on the portal (with an email address)<br>and the acknowledgement will land in seconds.</div>';return;}
+  el.innerHTML=rows.map((m,i)=>{
+    const t=typeOf(m),ref=refOf(m);
+    return `<div class="msg ${m.Read?"read":""} ${SEL===m.ID?"sel":""}" style="animation-delay:${Math.min(i*28,280)}ms" onclick="openMsg('${m.ID}')">
+      ${m.Read?"":'<span class="unread"></span>'}
+      <div class="av">${esc(initialOf(m))}</div>
+      <div class="body">
+        <div class="r1"><span class="from">${esc((m.From&&(m.From.Name||m.From.Address))||"AEGIS")}</span><span class="time">${rel(m.Created)}</span></div>
+        <div class="subj">${esc(m.Subject||"(no subject)")}</div>
+        <div class="snip">${esc(m.Snippet||"")}</div>
+        <div class="meta"><span class="tag"><span class="g">${TYPE_GLYPH[t]}</span>${TYPE_LABEL[t]}</span>${ref?`<span class="ref">${esc(ref)}</span>`:""}</div>
+      </div></div>`;
+  }).join("");
+}
+
+/* ── polling the catcher ── */
+async function refresh(){
+  try{
+    const r=await fetch(base()+"/api/v1/messages?limit=100");
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const d=await r.json();
+    const list=d.messages||[];
+    if(!firstLoad){
+      const fresh=list.filter(m=>!knownIds.has(m.ID));
+      if(fresh.length){toast(fresh.length===1?("New mail — "+(fresh[0].Subject||"")):(fresh.length+" new messages"));}
+    }
+    knownIds=new Set(list.map(m=>m.ID));
+    MSGS=list;firstLoad=false;
+    $("#liveTxt").textContent="live — "+(d.unread||0)+" unread of "+(d.total||list.length);
+    renderList();
+  }catch(e){
+    $("#liveTxt").textContent="can't reach the mail catcher — is the stack up?";
+    if(firstLoad)$("#msgs").innerHTML='<div class="empty"><b>Couldn\'t connect to Mailpit.</b><br>Start the stack (docker compose up -d), then reload.<br>Endpoint is configurable bottom-left.</div>';
+  }
+}
+function toast(text){const t=$("#toast");t.textContent="✉ "+text;t.style.display="block";clearTimeout(t._h);t._h=setTimeout(()=>t.style.display="none",4200);}
+
+/* ── reading pane ── */
+async function openMsg(id){
+  SEL=id;renderList();
+  $("#reader").classList.add("open");
+  try{
+    const r=await fetch(base()+"/api/v1/message/"+encodeURIComponent(id));
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const m=await r.json();
+    const meta=MSGS.find(x=>x.ID===id)||{};
+    const t=typeOf({Subject:m.Subject,Snippet:""}),ref=refOf({Subject:m.Subject,Snippet:m.Text||""});
+    $("#zero").style.display="none";
+    const head=$("#rhead");head.style.display="block";
+    head.innerHTML=`
+      <div class="subj">${esc(m.Subject||"(no subject)")}</div>
+      <div class="row">
+        <span class="tag"><span class="g">${TYPE_GLYPH[t]}</span>${TYPE_LABEL[t]}</span>${ref?`<span class="ref">${esc(ref)}</span>`:""}
+        <span class="who"><b>${esc((m.From&&(m.From.Name||m.From.Address))||"AEGIS")}</b> → ${esc((m.To&&m.To[0]&&m.To[0].Address)||"you")}</span>
+        <span class="when">${fullTime(m.Date||meta.Created)}</span>
+      </div>
+      <div class="actions">
+        <button class="abtn" onclick="markUnread('${id}')">Mark unread</button>
+        <button class="abtn del" onclick="delMsg('${id}')">Delete</button>
+      </div>`;
+    const body=$("#rbody");body.style.display="block";
+    if(m.HTML){
+      body.innerHTML='<div class="paper"><iframe sandbox="" id="mailFrame"></iframe></div>';
+      document.getElementById("mailFrame").srcdoc=m.HTML;
+    }else{
+      body.innerHTML='<div class="paper"><pre>'+esc(m.Text||"(empty message)")+"</pre></div>";
+    }
+    // opening marks it read
+    fetch(base()+"/api/v1/messages",{method:"PUT",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({IDs:[id],Read:true})}).then(refresh).catch(()=>{});
+  }catch(e){
+    $("#rbody").style.display="block";
+    $("#rbody").innerHTML='<div class="paper"><pre>Could not load this message ('+esc(e.message)+').</pre></div>';
+  }
+}
+async function markUnread(id){
+  await fetch(base()+"/api/v1/messages",{method:"PUT",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({IDs:[id],Read:false})}).catch(()=>{});
+  refresh();
+}
+async function delMsg(id){
+  await fetch(base()+"/api/v1/messages",{method:"DELETE",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({IDs:[id]})}).catch(()=>{});
+  if(SEL===id){SEL=null;$("#zero").style.display="grid";$("#rhead").style.display="none";$("#rbody").style.display="none";
+    $("#reader").classList.remove("open");}
+  refresh();
+}
+
+/* ── folders, search, keys ── */
+document.querySelectorAll(".folder").forEach(b=>b.onclick=()=>{
+  FOLDER=b.dataset.f;
+  document.querySelectorAll(".folder").forEach(x=>x.classList.toggle("active",x===b));
+  renderList();
+});
+$("#q").addEventListener("input",e=>{QUERY=e.target.value;renderList();});
+$("#mailBase").addEventListener("change",()=>{$("#mailpitLink").href=base();firstLoad=true;refresh();});
+document.addEventListener("keydown",e=>{
+  if(e.target.tagName==="INPUT")return;
+  const vis=MSGS.filter(m=>FOLDER==="all"||typeOf(m)===FOLDER);
+  const i=vis.findIndex(m=>m.ID===SEL);
+  if(e.key==="ArrowDown"&&vis.length){e.preventDefault();openMsg(vis[Math.min(i+1,vis.length-1)].ID);}
+  if(e.key==="ArrowUp"&&vis.length){e.preventDefault();openMsg(vis[Math.max(i-1,0)].ID);}
+  if(e.key==="Escape"){$("#reader").classList.remove("open");}
+});
+
+refresh();
+setInterval(()=>{if(!document.hidden)refresh();},5000);
+</script>
+</body>
+</html>
