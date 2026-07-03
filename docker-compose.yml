@@ -37,8 +37,9 @@ services:
     command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
 
   # Local mail catcher — every customer email lands in the inbox at http://localhost:8025
+  # (Mailpit: maintained MailHog successor, native arm64 + amd64)
   mailhog:
-    image: mailhog/mailhog
+    image: axllent/mailpit
     ports:
       - "8025:8025"
 
