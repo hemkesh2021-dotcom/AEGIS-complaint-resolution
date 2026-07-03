@@ -40,7 +40,7 @@ public class AuditService {
 
     @Transactional
     public void record(ComplaintResponse r, String complaintText, String customerName,
-                       String customerEmail, List<String> draftWarnings) {
+                       String customerEmail, List<String> draftWarnings, String citationsJson) {
         CaseRecord c = new CaseRecord();
         c.setComplaintId(r.complaintId());
         c.setTrackingToken(newTrackingToken());
@@ -49,6 +49,7 @@ public class AuditService {
         c.setComplaintText(complaintText);
         c.setDraftWarnings(draftWarnings == null || draftWarnings.isEmpty()
                 ? null : String.join("\n", draftWarnings));
+        c.setCitations(citationsJson == null || citationsJson.isBlank() ? "[]" : citationsJson);
         c.setCategory(r.prediction().label());
         c.setConfidence(r.prediction().confidence());
         c.setClause(r.compliance().clause());
@@ -73,6 +74,11 @@ public class AuditService {
                 "clause=" + r.compliance().clause()
                         + " resolutionDue=" + r.compliance().resolutionDue()
                         + " riskFlags=" + String.join(",", r.compliance().riskFlags())));
+        events.save(new AuditEvent(id, "retrieve",
+                citationsJson != null && citationsJson.length() > 4
+                        ? "grounding passages: " + (citationsJson.length() > 300
+                            ? citationsJson.substring(0, 300) + "…" : citationsJson)
+                        : "no passages retrieved"));
         events.save(new AuditEvent(id, "draft",
                 "source=" + r.draft().source() + " subject=" + r.draft().subject()));
         events.save(new AuditEvent(id, "verification",

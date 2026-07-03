@@ -36,13 +36,6 @@ public class IngestionService {
     @EventListener(ApplicationReadyEvent.class)
     public void ingestOnStartup() {
         try {
-            List<Document> existing = vectorStore.similaritySearch(
-                    SearchRequest.builder().query("complaint regulation").topK(1).build());
-            if (existing != null && !existing.isEmpty()) {
-                log.info("Knowledge base already present — skipping ingestion.");
-                return;
-            }
-
             List<Document> docs = new ArrayList<>();
             ObjectMapper mapper = new ObjectMapper();
             try (InputStream in = new ClassPathResource("knowledge/kb.json").getInputStream()) {
@@ -54,8 +47,32 @@ public class IngestionService {
                     docs.add(new Document(n.path("text").asText(""), meta));
                 }
             }
-            vectorStore.add(docs);
-            log.info("Ingested {} knowledge-base passages into pgvector.", docs.size());
+
+            // Incremental: ingest only passages the store doesn't have yet, so the
+            // KB can grow without wiping the database (checked per source id).
+            List<Document> missing = new ArrayList<>();
+            for (Document d : docs) {
+                String id = String.valueOf(d.getMetadata().get("source"));
+                boolean present = false;
+                try {
+                    List<Document> hit = vectorStore.similaritySearch(SearchRequest.builder()
+                            .query(d.getText()).topK(1)
+                            .filterExpression("source == '" + id + "'").build());
+                    present = hit != null && !hit.isEmpty();
+                } catch (Exception e) {
+                    // treat as missing — worst case we re-add one passage
+                }
+                if (!present) {
+                    missing.add(d);
+                }
+            }
+            if (missing.isEmpty()) {
+                log.info("Knowledge base up to date ({} passages).", docs.size());
+                return;
+            }
+            vectorStore.add(missing);
+            log.info("Ingested {} new knowledge-base passages ({} already present).",
+                    missing.size(), docs.size() - missing.size());
         } catch (Exception e) {
             log.warn("Knowledge-base ingestion failed ({}); retrieval will return empty context.", e.getMessage());
         }

@@ -30,6 +30,10 @@ public class CaseRecord {
     @Column(columnDefinition = "text")
     private String draftWarnings;
 
+    /** JSON array of the retrieval citations that grounded the draft. */
+    @Column(columnDefinition = "text")
+    private String citations;
+
     private String category;
     private double confidence;
 
@@ -89,6 +93,9 @@ public class CaseRecord {
 
     public String getDraftWarnings() { return draftWarnings; }
     public void setDraftWarnings(String v) { this.draftWarnings = v; }
+
+    public String getCitations() { return citations; }
+    public void setCitations(String v) { this.citations = v; }
 
     public String getComplaintText() { return complaintText; }
     public void setComplaintText(String v) { this.complaintText = v; }

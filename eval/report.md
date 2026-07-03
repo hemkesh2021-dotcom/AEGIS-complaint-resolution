@@ -10,7 +10,7 @@ Cases: **18** curated, deliberately clear-cut · API: `http://localhost:8080`
 | Escalation precision | 88% |
 | Escalation recall | 100% |
 | Escalation F1 | 0.93 |
-| Retrieval hit-rate (top-4) | 94% (17/18) |
+| Retrieval hit-rate (top-4) | 100% (18/18) |
 | Urgency distribution | {'CRITICAL': 7, 'NORMAL': 10, 'PRIORITIZED': 1} |
 
 | Expected | Predicted | ✓ | exp.esc | got.esc | retr✓ |
@@ -19,7 +19,7 @@ Cases: **18** curated, deliberately clear-cut · API: `http://localhost:8080`
 | Credit card | Credit card | ✓ | False | False | ✓ |
 | Credit card | Credit card | ✓ | True | True | ✓ |
 | Mortgage | Mortgage | ✓ | False | False | ✓ |
-| Mortgage | Mortgage | ✓ | True | True | ✗ |
+| Mortgage | Mortgage | ✓ | True | True | ✓ |
 | Debt collection | Debt collection | ✓ | True | True | ✓ |
 | Debt collection | Debt collection | ✓ | False | True | ✓ |
 | Checking or savings account | Checking or savings account | ✓ | False | False | ✓ |

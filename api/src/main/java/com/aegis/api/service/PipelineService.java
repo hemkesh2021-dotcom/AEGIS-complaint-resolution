@@ -8,6 +8,7 @@ import com.aegis.api.dto.ComplaintResponse.Escalation;
 import com.aegis.api.dto.ComplaintResponse.Prediction;
 import com.aegis.api.dto.ComplaintResponse.Task;
 import com.aegis.api.service.RagRetriever.RetrievedContext;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -22,6 +23,7 @@ import org.springframework.stereotype.Service;
 public class PipelineService {
 
     private static final DateTimeFormatter ISO_MIN = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final ClassifierClient classifier;
     private final ComplianceEngine compliance;
@@ -83,8 +85,15 @@ public class PipelineService {
         ComplaintResponse response = new ComplaintResponse(
                 id, prediction, comp, draft, tasks, esc, urgency, "IN_REVIEW", channel);
 
-        // Phase 7 — audit
-        audit.record(response, req.text(), customer, req.email(), draftWarnings);
+        // Phase 7 — audit (citations: the passages that grounded this draft)
+        String citationsJson = "[]";
+        try {
+            citationsJson = JSON.writeValueAsString(
+                    context == null ? List.of() : context.citations());
+        } catch (Exception ignored) {
+            // audit still proceeds without citations
+        }
+        audit.record(response, req.text(), customer, req.email(), draftWarnings, citationsJson);
         return response;
     }
 

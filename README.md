@@ -15,6 +15,8 @@ A **Spring Boot** (Java 21) orchestrator chains seven phases — ingest → clas
 - **PII never crosses the trust boundary.** Prompts to the external LLM are redacted (emails, phones, card/account numbers, SSNs) and the customer's name travels as a `{CUSTOMER_NAME}` token substituted back locally. Classification and embeddings run fully local. A daily job purges expired data (`AEGIS_RETENTION_DAYS`).
 - **Unguessable tracking.** Customers track cases with a 128-bit `TRK-…` token; short CMP references are never accepted on public endpoints, so cases can't be enumerated. Both public endpoints are per-IP rate-limited.
 - **Immutable communications.** Sent replies can't be edited — corrections go out as follow-up messages the customer sees as a thread, each one re-verified and audited.
+- **Hybrid, citation-pinned retrieval.** Semantic search (pgvector) fused with keyword BM25 via reciprocal-rank fusion — embeddings catch paraphrase, BM25 catches exact regulatory vocabulary. Every case stores the exact passages that grounded its draft, and the operator sees them as "Grounding sources" before approving. If pgvector is down, retrieval degrades to keyword-only instead of failing.
+- **A learning loop, closed.** Every approval is implicit feedback: the edit-similarity between AI draft and human-approved final is computed, audited, and exported at `GET /api/training-data` as labeled retraining examples.
 - **Honestly evaluated.** Accuracy is measured on a *temporal holdout* refreshed from the live CFPB API — not a curated demo set (see [Evaluation](#evaluation)).
 - **Explainable by default.** Deadlines, risk flags, escalation, and urgency are deterministic rules with recorded reasons — ML only where it earns its place, and low classifier confidence auto-escalates to a human.
 
@@ -94,9 +96,11 @@ python3 eval/run_eval.py              # writes eval/report.md
 | Escalation precision | 88% |
 | Escalation recall | 100% |
 | Escalation F1 | 0.93 |
-| Retrieval hit-rate (top-4) | 94% (17/18) |
+| Retrieval hit-rate (top-4) | 100% (18/18) |
 
 _These scores mean the pipeline behaves correctly on unambiguous inputs — a regression check, **not** a real-world accuracy claim. The single escalation "false positive" is a low-confidence case correctly routed to human review._ See `eval/README.md`.
+
+_Retrieval was 94% before hybrid search: one foreclosure case always missed. The citation system showed **why** — the knowledge base had no foreclosure passage at all. The fix was knowledge (RESPA loss-mitigation rules added to `kb.json`), not metric tuning; incremental ingestion picked it up without touching the existing store._
 
 ## Tests
 
@@ -134,7 +138,7 @@ Deploys the classifier (private) and the API (public, wired to the classifier UR
 
 ## Roadmap
 
-OAuth2/OIDC with operator roles + maker-checker approval · inbound email intake · hybrid retrieval (BM25 + reranker) with citation-pinned drafts · periodic retraining job over `/api/training-data` · multilingual intake · case-intelligence dashboard · k6 load-test benchmarks.
+OAuth2/OIDC with operator roles + maker-checker approval · inbound email intake · cross-encoder reranking on top of hybrid retrieval · periodic retraining job over `/api/training-data` · multilingual intake · case-intelligence dashboard · k6 load-test benchmarks.
 
 ## Contributing
 

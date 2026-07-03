@@ -315,6 +315,16 @@ async function openCase(id){
               <label>Reply — edit before sending</label>
               <textarea id="apBody" style="min-height:240px">${esc(c.draftBody||"")}</textarea>
               <button class="btn" id="apSend" onclick="approveCase('${esc(c.complaintId)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>Approve &amp; send</button>`}</div>
+        ${(()=>{try{const cit=JSON.parse(c.citations||"[]");if(!cit.length)return"";
+          return `<div class="card full"><h3>Grounding sources — the passages behind this draft</h3>${cit.map(x=>`
+            <div style="padding:11px 0;border-bottom:1px solid var(--border)">
+              <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
+                <span class="chip gold" style="font-family:ui-monospace,monospace;font-size:11px">${esc(x.source)}</span>
+                ${x.category?`<span class="chip">${esc(x.category)}</span>`:""}
+                <span class="chip ${x.via==="hybrid"?"ok":""}" style="font-size:10.5px">${x.via==="hybrid"?"✓ semantic + keyword":esc(x.via)+" match"}</span>
+              </div>
+              <div style="font-size:12.5px;color:var(--muted);line-height:1.65">${esc(x.snippet)}</div>
+            </div>`).join("")}</div>`;}catch(e){return""}})()}
         <div class="card full"><h3>Audit trail</h3><div class="tl">${tl||'<div class="empty">No events.</div>'}</div></div>
       </div>`;
     el.scrollIntoView({behavior:"smooth",block:"start"});
