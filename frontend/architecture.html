@@ -249,7 +249,122 @@ function makeLabel(title,sub,accent){
   LABELS.push({cv,t,title,sub,accent});
   return s;
 }
-document.fonts.ready.then(()=>{LABELS.forEach(L=>{drawLabel(L.cv,L.title,L.sub,L.accent);L.t.needsUpdate=true;});});
+/* screen textures — miniature renders of the REAL web pages */
+const SCREENS=[];
+function screenTexture(w,h,draw){
+  const cv=document.createElement("canvas");cv.width=w;cv.height=h;
+  draw(cv.getContext("2d"),w,h);
+  const t=new THREE.CanvasTexture(cv);t.minFilter=THREE.LinearFilter;t.anisotropy=4;
+  SCREENS.push({cv,t,draw,w,h});
+  return t;
+}
+const UI={bg:"#0B0906",card:"rgba(255,250,240,.05)",border:"rgba(240,207,142,.28)",borderSoft:"rgba(240,207,142,.13)",
+  text:"#F2EDE4",muted:"#9A917F",faint:"#6E665A",gold:"#DDB35A",goldHi:"#F0CF8E",dark:"#2A1C04",
+  ok:"#5BBF92",info:"#7EC5DE",danger:"#E06B6B",input:"#0A0806"};
+function RR(x,X,Y,W,H,R){x.beginPath();x.moveTo(X+R,Y);x.arcTo(X+W,Y,X+W,Y+H,R);
+  x.arcTo(X+W,Y+H,X,Y+H,R);x.arcTo(X,Y+H,X,Y,R);x.arcTo(X,Y,X+W,Y,R);x.closePath();}
+function goldGrad(x,X,Y,W,H){const g=x.createLinearGradient(X,Y,X+W,Y+H);
+  g.addColorStop(0,UI.goldHi);g.addColorStop(1,"#B8862F");return g;}
+function brandRow(x,X,Y,s,sub){
+  RR(x,X,Y,s,s,s*.28);x.fillStyle=goldGrad(x,X,Y,s,s);x.fill();
+  x.fillStyle=UI.dark;x.font=`700 ${s*.62}px 'Space Grotesk',sans-serif`;x.textAlign="center";
+  x.fillText("◆",X+s/2,Y+s*.72);x.textAlign="left";
+  x.fillStyle=UI.text;x.font=`700 ${s*.78}px 'Space Grotesk',sans-serif`;
+  x.fillText("AEGIS",X+s+10,Y+s*.75);
+  if(sub){x.fillStyle=UI.faint;x.font=`400 ${s*.42}px 'Inter',sans-serif`;
+    x.fillText(sub,X+s+10+x.measureText("AEGIS").width*1.9,Y+s*.72);}
+}
+/* the customer portal page: brand → lodge card (inputs + gold button) → green ack card */
+function drawPortalScreen(x,W,H){
+  x.clearRect(0,0,W,H);x.fillStyle=UI.bg;x.fillRect(0,0,W,H);
+  let g=x.createRadialGradient(70,0,0,70,0,320);g.addColorStop(0,"rgba(221,179,90,.20)");g.addColorStop(1,"rgba(0,0,0,0)");
+  x.fillStyle=g;x.fillRect(0,0,W,340);
+  brandRow(x,26,22,30);
+  x.fillStyle=UI.muted;x.font="400 15px 'Inter',sans-serif";
+  x.fillText("Lodge a complaint and track its progress.",26,74);
+  /* lodge card */
+  RR(x,20,92,W-40,232,16);x.fillStyle=UI.card;x.fill();x.strokeStyle=UI.borderSoft;x.lineWidth=2;x.stroke();
+  x.fillStyle=UI.goldHi;x.font="600 17px 'Space Grotesk',sans-serif";x.fillText("Lodge a complaint",40,124);
+  x.fillStyle=UI.faint;x.font="400 12px 'Inter',sans-serif";x.fillText("YOUR NAME",40,152);x.fillText("EMAIL",258,152);
+  RR(x,40,160,200,30,8);x.fillStyle=UI.input;x.fill();x.strokeStyle=UI.borderSoft;x.stroke();
+  RR(x,258,160,W-298,30,8);x.fillStyle=UI.input;x.fill();x.stroke();
+  x.fillStyle=UI.muted;x.font="400 13px 'Inter',sans-serif";x.fillText("A. Rao",50,180);
+  x.fillStyle=UI.faint;x.fillText("WHAT HAPPENED?",40,212);
+  RR(x,40,220,W-80,52,8);x.fillStyle=UI.input;x.fill();x.strokeStyle=UI.borderSoft;x.stroke();
+  x.fillStyle=UI.muted;x.fillText("I noticed three charges on my credit card…",50,242);
+  RR(x,40,284,W-80,30,9);x.fillStyle=goldGrad(x,40,284,W-80,30);x.fill();
+  x.fillStyle=UI.dark;x.font="700 14px 'Space Grotesk',sans-serif";x.textAlign="center";
+  x.fillText("Submit complaint",W/2,304);x.textAlign="left";
+  /* ack card */
+  RR(x,20,342,W-40,H-366,16);x.fillStyle="rgba(91,191,146,.07)";x.fill();
+  x.strokeStyle="rgba(91,191,146,.4)";x.lineWidth=2;x.stroke();
+  x.beginPath();x.arc(52,382,14,0,7);x.fillStyle="rgba(91,191,146,.16)";x.fill();
+  x.strokeStyle=UI.ok;x.lineWidth=3;x.beginPath();x.moveTo(45,382);x.lineTo(50,388);x.lineTo(60,375);x.stroke();
+  x.fillStyle=UI.muted;x.font="400 12px 'Inter',sans-serif";x.fillText("Complaint received — your reference is",76,376);
+  x.fillStyle=UI.goldHi;x.font="700 19px 'Space Grotesk',sans-serif";x.fillText("CMP-235A793B",76,398);
+  x.strokeStyle=UI.borderSoft;x.lineWidth=1;
+  const kv=(y,k,v,vc)=>{x.fillStyle=UI.faint;x.font="400 12px 'Inter',sans-serif";x.fillText(k,40,y);
+    x.fillStyle=vc||UI.text;x.textAlign="right";x.fillText(v,W-40,y);x.textAlign="left";
+    x.beginPath();x.moveTo(40,y+9);x.lineTo(W-40,y+9);x.stroke();};
+  kv(424,"Status","● Under review",UI.goldHi);
+  kv(450,"Tracking code","TRK-FEE8…11DA",UI.gold);
+  kv(476,"We'll respond by","August 13, 2026");
+  x.fillStyle=UI.faint;x.font="italic 400 11px 'Inter',sans-serif";
+  x.fillText("● updates automatically when a specialist responds",40,H-14);
+}
+/* the operator console: sidebar nav → filter chips → urgency-sorted queue table */
+function drawConsoleScreen(x,W,H){
+  x.clearRect(0,0,W,H);x.fillStyle=UI.bg;x.fillRect(0,0,W,H);
+  let g=x.createRadialGradient(0,0,0,0,0,300);g.addColorStop(0,"rgba(221,179,90,.14)");g.addColorStop(1,"rgba(0,0,0,0)");
+  x.fillStyle=g;x.fillRect(0,0,300,260);
+  /* sidebar */
+  x.fillStyle="rgba(255,250,240,.03)";x.fillRect(0,0,168,H);
+  x.strokeStyle=UI.borderSoft;x.lineWidth=1.5;x.beginPath();x.moveTo(168,0);x.lineTo(168,H);x.stroke();
+  brandRow(x,16,18,26);
+  x.fillStyle=UI.faint;x.font="400 11px 'Inter',sans-serif";x.fillText("Operator Console",16,62);
+  const nav=[["Review queue",true],["Escalations",false],["New case",false],["System map · 3D",false]];
+  nav.forEach(([t,on],i)=>{const y=80+i*38;
+    if(on){RR(x,10,y,148,30,9);x.fillStyle="rgba(221,179,90,.15)";x.fill();x.strokeStyle=UI.border;x.stroke();}
+    x.fillStyle=on?UI.text:UI.muted;x.font=`${on?600:400} 13px 'Inter',sans-serif`;x.fillText(t,22,y+20);});
+  x.fillStyle=UI.faint;x.font="600 9px 'Inter',sans-serif";x.fillText("SYSTEM STATUS",16,H-74);
+  [["API online",UI.ok],["DistilBERT · 11 cat.",UI.ok],["pgvector KB",UI.ok]].forEach(([t,c],i)=>{
+    x.beginPath();x.arc(21,H-56+i*18,3.5,0,7);x.fillStyle=c;x.fill();
+    x.fillStyle=UI.muted;x.font="400 11px 'Inter',sans-serif";x.fillText(t,32,H-52+i*18);});
+  /* main */
+  x.fillStyle=UI.text;x.font="700 20px 'Space Grotesk',sans-serif";x.fillText("Operator Console",192,40);
+  x.fillStyle=UI.faint;x.font="400 12px 'Inter',sans-serif";
+  x.fillText("Work the queue by urgency → review the AI draft → approve & send.",192,62);
+  const chips=[["Needs review",true],["Escalated",false],["Sent",false],["All",false]];
+  let cx=192;chips.forEach(([t,on])=>{x.font="500 11px 'Inter',sans-serif";const w=x.measureText(t).width+24;
+    RR(x,cx,76,w,24,12);
+    if(on){x.fillStyle="rgba(221,179,90,.18)";x.fill();x.strokeStyle=UI.border;}else{x.strokeStyle=UI.borderSoft;}
+    x.stroke();x.fillStyle=on?UI.goldHi:UI.muted;x.fillText(t,cx+12,92);cx+=w+8;});
+  /* table */
+  x.fillStyle=UI.faint;x.font="600 9px 'Inter',sans-serif";
+  x.fillText("CASE",192,124);x.fillText("CATEGORY",300,124);x.fillText("URGENCY",436,124);x.fillText("STATUS",540,124);
+  x.strokeStyle=UI.borderSoft;x.beginPath();x.moveTo(192,132);x.lineTo(W-24,132);x.stroke();
+  const rows=[
+    ["CMP-622C4843","Credit card","CRITICAL",UI.danger,"Sent ✓",UI.ok],
+    ["CMP-235A793B","Credit card","CRITICAL",UI.danger,"Sent ✓",UI.ok],
+    ["CMP-53FC1868","Mortgage","NORMAL",UI.muted,"In review",UI.goldHi],
+    ["CMP-8F3E7EE6","Debt mgmt","PRIORITIZED",UI.gold,"In review",UI.goldHi],
+    ["CMP-A7185A9C","Credit card","NORMAL",UI.muted,"In review",UI.goldHi],
+  ];
+  rows.forEach((r,i)=>{const y=146+i*34;
+    if(i===2){RR(x,184,y-14,W-208,30,7);x.fillStyle="rgba(221,179,90,.08)";x.fill();}
+    x.fillStyle=UI.text;x.font="500 12px 'Inter',sans-serif";x.fillText(r[0],192,y+6);
+    x.fillStyle=UI.muted;x.font="400 12px 'Inter',sans-serif";x.fillText(r[1],300,y+6);
+    x.font="600 10px 'Inter',sans-serif";const uw=x.measureText(r[2]).width+16;
+    RR(x,436,y-8,uw,20,10);x.strokeStyle=r[3];x.globalAlpha=.75;x.stroke();x.globalAlpha=1;
+    x.fillStyle=r[3];x.fillText(r[2],444,y+6);
+    x.fillStyle=r[5];x.font="500 11px 'Inter',sans-serif";x.fillText(r[4],540,y+6);
+    x.strokeStyle="rgba(240,207,142,.07)";x.beginPath();x.moveTo(192,y+18);x.lineTo(W-24,y+18);x.stroke();});
+}
+
+document.fonts.ready.then(()=>{
+  LABELS.forEach(L=>{drawLabel(L.cv,L.title,L.sub,L.accent);L.t.needsUpdate=true;});
+  SCREENS.forEach(s=>{s.draw(s.cv.getContext("2d"),s.w,s.h);s.t.needsUpdate=true;});
+});
 
 /* ───────────────────────── stage ───────────────────────── */
 const stage=new THREE.Group();scene.add(stage);
@@ -307,37 +422,47 @@ function registerNode(id,group,pickMesh,pos,label,info,hotMats){
   bornStagger+=130;
 }
 
-/* Customer Portal — floating glass slab */
-function clientPanel(color,screenTint){
-  const g=new THREE.Group();
-  const body=new THREE.Mesh(roundedBoxGeo(3.8,2.5,.26,.16),glassMat(color,{opacity:.96}));
-  const strip=new THREE.Mesh(roundedBoxGeo(3.5,.16,.3,.07),neonMat(color,1.4));strip.position.y=1.02;
-  const scr=new THREE.Mesh(new THREE.PlaneGeometry(3.3,1.78),
-    new THREE.MeshStandardMaterial({color:screenTint,roughness:.4,metalness:.1,emissive:screenTint,emissiveIntensity:.35}));
-  scr.position.set(0,-.14,.15);
-  const halo=new THREE.Mesh(new THREE.TorusGeometry(2.15,.03,12,80),neonMat(color,.8));
-  halo.rotation.x=Math.PI/2;halo.position.y=-1.85;
-  const gl=glowSprite(color,4.4,.32);gl.position.y=-.1;
-  g.add(gl,body,strip,scr,halo);
-  return {g,body,strip,halo};
-}
+/* Customer Portal — a portrait glass page: the actual portal UI on screen */
 {
-  const {g,body,strip,halo}=clientPanel(C.gold,0x1A1409);
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(roundedBoxGeo(2.95,3.55,.26,.15),glassMat(C.gold,{opacity:.97}));
+  const strip=new THREE.Mesh(roundedBoxGeo(2.6,.13,.3,.055),neonMat(C.gold,1.3));strip.position.y=1.66;
+  const scr=new THREE.Mesh(new THREE.PlaneGeometry(2.62,3.15),
+    new THREE.MeshBasicMaterial({map:screenTexture(480,576,drawPortalScreen)}));
+  scr.material.toneMapped=false;scr.position.set(0,-.06,.15);
+  const halo=new THREE.Mesh(new THREE.TorusGeometry(2.0,.03,12,80),neonMat(C.gold,.8));
+  halo.rotation.x=Math.PI/2;halo.position.y=-2.35;
+  const gl=glowSprite(C.gold,4.6,.3);gl.position.y=-.1;
+  g.add(gl,body,strip,scr,halo);
   g.userData.halo=halo;
-  registerNode("portal",g,body,new THREE.Vector3(-18,3.6,7),
+  registerNode("portal",g,body,new THREE.Vector3(-18,3.7,7),
     makeLabel("Customer Portal","lodge · track · live thread","#DDB35A"),{
-    title:"Customer Portal",sub:"public web client",labelH:2.7,
+    title:"Customer Portal",sub:"public web client",labelH:2.6,
     tags:["public endpoints only","TRK tracking token","rate-limited"],
     code:["portal.html"],
     text:"Where a grievance begins. Customers lodge a complaint and get a 128-bit TRK tracking token — the short CMP reference is never accepted publicly, so cases can't be enumerated. The page live-updates when a specialist responds, shows an AI summary with the full reply, and renders every follow-up as a thread."},[strip.material,halo.material]);
 }
-/* Operator Console */
+/* Operator Console — a widescreen command surface: sidebar + live queue on screen */
 {
-  const {g,body,strip,halo}=clientPanel(C.info,0x0E1418);
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(roundedBoxGeo(4.5,2.7,.26,.15),glassMat(C.info,{opacity:.97}));
+  const strip=new THREE.Mesh(roundedBoxGeo(4.15,.13,.3,.055),neonMat(C.info,1.2));strip.position.y=1.24;
+  const scr=new THREE.Mesh(new THREE.PlaneGeometry(4.16,2.29),
+    new THREE.MeshBasicMaterial({map:screenTexture(800,440,drawConsoleScreen)}));
+  scr.material.toneMapped=false;scr.position.set(0,-.06,.15);
+  /* a stand — consoles sit on desks */
+  const stem=new THREE.Mesh(new THREE.CylinderGeometry(.09,.14,.9,24),metalMat(C.steel,{emissiveIntensity:.05}));
+  stem.position.y=-1.75;
+  const foot=new THREE.Mesh(new THREE.CylinderGeometry(.75,.85,.12,40),metalMat(C.steel,{emissiveIntensity:.05}));
+  foot.position.y=-2.22;
+  const halo=new THREE.Mesh(new THREE.TorusGeometry(2.3,.03,12,80),neonMat(C.info,.8));
+  halo.rotation.x=Math.PI/2;halo.position.y=-2.3;
+  const gl=glowSprite(C.info,4.8,.28);gl.position.y=-.1;
+  g.add(gl,body,strip,scr,stem,foot,halo);
   g.userData.halo=halo;
   registerNode("console",g,body,new THREE.Vector3(-18,3.6,-7),
     makeLabel("Operator Console","queue · review · approve","#7EC5DE"),{
-    title:"Operator Console",sub:"human-in-the-loop",labelH:2.7,
+    title:"Operator Console",sub:"human-in-the-loop",labelH:2.3,
     tags:["X-API-Key auth","urgency queue","send gate + override audit"],
     code:["index.html"],
     text:"Operators work the queue by urgency, read the AI analysis, and edit the draft before sending. The grounding gate re-verifies the final text at the moment of approval — invented figures or template debris block the send. Sent replies become immutable; corrections go out as audited follow-ups."},[strip.material,halo.material]);
@@ -388,8 +513,8 @@ function clientPanel(color,screenTint){
 /* Neural Classifier — core in a translucent shell with orbiting electrons */
 {
   const g=new THREE.Group();
-  const plat=new THREE.Mesh(roundedBoxGeo(3,.42,3,.14),metalMat(0x2A2E33,{emissiveIntensity:.04}));
-  plat.rotation.x=Math.PI/2;plat.position.y=-.9;
+  const plat=new THREE.Mesh(roundedBoxGeo(3,3,.42,.14),metalMat(0x2A2E33,{emissiveIntensity:.04}));
+  plat.rotation.x=-Math.PI/2;plat.position.y=-.9;
   const core=new THREE.Mesh(new THREE.SphereGeometry(.72,48,48),neonMat(C.info,1.6));
   const shell=new THREE.Mesh(new THREE.SphereGeometry(1.18,48,48),
     glassMat(C.info,{opacity:.22,roughness:.05,emissiveIntensity:.05}));

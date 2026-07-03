@@ -87,10 +87,21 @@ Read endpoints (Week 3):
 
 ## Evaluation
 
-Score the deterministic pipeline against a labeled set (no LLM, no DB writes — via `POST /api/eval`):
+Two evaluations, honestly separated — one measures real accuracy, the other proves nothing broke. Both call `POST /api/eval` (no LLM, no DB writes; stack must be running).
+
+**1 · CFPB temporal holdout — the numbers to quote.** A stratified sample of the *most recent* complaint narratives from the CFPB public API. Because they were published after the model was trained, they cannot overlap the training data:
 
 ```bash
-python3 eval/run_eval.py        # stack must be running; writes eval/report.md
+python3 eval/fetch_cfpb_sample.py     # ~220 fresh cases, stratified over 11 categories
+python3 eval/run_eval.py --cfpb       # accuracy + per-category P/R/F1 + confusion matrix
+```
+
+**Latest holdout run — 77.3% overall accuracy (170/220, all 11 categories)**, consistent with the ~75% held-out test split at training time. Highlights: Vehicle loan F1 **0.95**, Prepaid card **0.91**, Student loan **0.88**. The model's one real weakness is the semantically adjacent debt cluster: "Debt or credit management" acts as a magnet for misclassifications (precision 40%), pulling cases from Debt collection (6×) and Credit reporting (4×) — a category-boundary problem even humans argue about. Full per-category table and confusion matrix: [`eval/cfpb_report.md`](eval/cfpb_report.md). Regenerate any time — recency keeps it honest.
+
+**2 · Behavioral regression suite** — 18 curated, deliberately clear-cut cases exercising classification, escalation, and retrieval end to end:
+
+```bash
+python3 eval/run_eval.py              # writes eval/report.md
 ```
 
 | Metric | Result |
@@ -101,7 +112,17 @@ python3 eval/run_eval.py        # stack must be running; writes eval/report.md
 | Escalation F1 | 0.93 |
 | Retrieval hit-rate (top-4) | 94% (17/18) |
 
-_The eval set is a small, deliberately clear-cut behavioral set — a regression/sanity check, not a real-world accuracy claim (the model scored ~75% on the full held-out CFPB test set). The single escalation false-positive is a low-confidence case that was correctly routed to human review._ See `eval/README.md`.
+_These scores mean the pipeline behaves correctly on unambiguous inputs — a regression check, **not** a real-world accuracy claim. The single escalation "false positive" is a low-confidence case correctly routed to human review._ See `eval/README.md`.
+
+## Tests
+
+The deterministic core is unit-tested (`mvn test`; runs on every CI push):
+
+- **DraftVerifier** — the grounding gate, including a regression test that reproduces a real caught incident (an LLM draft citing $150 against a $420 complaint, with an invented 1-800 number and a `[Bank Name]` placeholder).
+- **PiiRedactor** — every identifier class is stripped; complaint substance and amounts survive.
+- **ComplianceEngine** — exact business-day deadline math (weekend skipping) and all four risk-flag families.
+- **EscalationDecider** — risk-flag and confidence-threshold behavior, including the 0.55 boundary.
+- **ApiKeyFilter** — 401 without key, public paths open, per-IP rate limits on intake *and* status, fail-closed when unconfigured.
 
 ## Security
 
