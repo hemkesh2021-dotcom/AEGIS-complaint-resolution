@@ -1,89 +1,70 @@
-# AEGIS v2 — Polyglot RAG Complaint Pipeline
+# AEGIS — Agentic Complaint Resolution
 
 ![CI](https://github.com/hemkesh2021-dotcom/AEGIS-complaint-resolution/actions/workflows/ci.yml/badge.svg)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A production-shaped rebuild of AEGIS: a **Spring Boot** orchestrator (Java 21) that calls a **Python** DistilBERT classifier service, applies explainable compliance rules, drafts a reply, decides escalation, and audits every case. Deployable on GCP Cloud Run.
+A banking grievance system that takes a complaint from intake to a regulator-aware, human-approved response — and **verifies its own AI before anything reaches a customer**.
 
-> This is the Weeks 1–3 foundation from `../AEGIS_v2_Roadmap.md`. RAG retrieval + LLM drafting (Weeks 4–5), the Postgres audit store (Week 3), and CI/CD (Week 7) are marked with `TODO`s and ready to slot in. See `../AEGIS_v2_Architecture.md` and `../AEGIS_v2_Prototype_Walkthrough.md` for the full design.
+A **Spring Boot** (Java 21) orchestrator chains seven phases — ingest → classify → compliance → retrieve → draft → verify → audit — calling a **Python DistilBERT** classifier, **pgvector** RAG retrieval over regulation passages, and an external LLM (**NVIDIA NIM**) for drafting, with a deterministic template engine as automatic fallback. Customers get a live-updating portal; operators get an urgency-sorted review console; every case gets an append-only audit trail.
+
+**Explore the system as an [interactive 3D architecture](frontend/architecture.html)** — served at `http://localhost:8088/architecture.html` once the stack is up. Every pulse in the animation is a real data path.
+
+## Why it's different
+
+- **Grounding gate.** Every AI draft is verified twice — at draft time and again at the moment of approval. Amounts, dates, and phone numbers must appear in the complaint or retrieved context; template debris (`[Bank Name]`, raw timestamps) is caught. A reply citing $150 against a $420 complaint is blocked with a 422; operator overrides are possible but audit-trailed. This caught a real hallucination during development — there's a regression test reproducing it.
+- **PII never crosses the trust boundary.** Prompts to the external LLM are redacted (emails, phones, card/account numbers, SSNs) and the customer's name travels as a `{CUSTOMER_NAME}` token substituted back locally. Classification and embeddings run fully local. A daily job purges expired data (`AEGIS_RETENTION_DAYS`).
+- **Unguessable tracking.** Customers track cases with a 128-bit `TRK-…` token; short CMP references are never accepted on public endpoints, so cases can't be enumerated. Both public endpoints are per-IP rate-limited.
+- **Immutable communications.** Sent replies can't be edited — corrections go out as follow-up messages the customer sees as a thread, each one re-verified and audited.
+- **Honestly evaluated.** Accuracy is measured on a *temporal holdout* refreshed from the live CFPB API — not a curated demo set (see [Evaluation](#evaluation)).
+- **Explainable by default.** Deadlines, risk flags, escalation, and urgency are deterministic rules with recorded reasons — ML only where it earns its place, and low classifier confidence auto-escalates to a human.
 
 ## Layout
 
 ```
 aegis-v2/
-├── api/          Spring Boot orchestrator (Java 21) — the brain
-│   └── src/main/java/com/aegis/api/{controller,dto,service}
-│   └── src/main/resources/{application.yml,regulations.json,templates.json}
-├── classifier/   Python FastAPI service serving DistilBERT (+ heuristic fallback)
-├── frontend/     Single-file HTML console (index.html)
+├── api/          Spring Boot orchestrator (Java 21) — pipeline, gate, audit
+│   ├── src/main/java/com/aegis/api/{controller,dto,entity,repo,service}
+│   ├── src/main/resources/{application.yml,regulations.json,templates.json,knowledge/kb.json}
+│   └── src/test/java/…                  unit tests (grounding gate, compliance clocks, security filter…)
+├── classifier/   Python FastAPI serving fine-tuned DistilBERT (+ heuristic fallback)
+├── frontend/     portal.html (customer) · index.html (operator console) · architecture.html (3D)
+├── eval/         behavioral suite + CFPB temporal-holdout harness
 ├── infra/        deploy.sh — Cloud Run deploy for both services
-└── docker-compose.yml   local end-to-end (classifier + api + Postgres/pgvector)
+└── docker-compose.yml   local end-to-end (classifier + api + Postgres/pgvector + nginx)
 ```
 
-## What works today
-
-- `POST /api/complaints` runs the full pipeline: classify → compliance (deadlines + risk) → draft (template) → tasks → escalation → audit (logged).
-- The API works **even without the model service** — `ClassifierClient` falls back to a keyword heuristic, so you get a live endpoint on day one.
-- The classifier service reuses your **v1 trained model** via the `../models` mount.
-
-## Quickstart (local, one command)
+## Quickstart
 
 ```bash
-cd aegis-v2
+cp .env.example .env        # set AEGIS_API_KEY (and NIM_API_KEY for live LLM drafts)
 docker compose up --build
 ```
 
-- API → http://localhost:8080  · health → http://localhost:8080/health
-- Classifier → http://localhost:8000/health  (`model_loaded: true` if the model mounted)
-- Frontend → open `frontend/index.html` in a browser (API base defaults to http://localhost:8080)
+| Surface | URL |
+|---|---|
+| Customer portal | http://localhost:8088/portal.html |
+| Operator console | http://localhost:8088 (enter your `AEGIS_API_KEY` in the sidebar) |
+| 3D architecture | http://localhost:8088/architecture.html |
+| API health | http://localhost:8080/health |
 
-Test the API directly:
+Without a NIM key the pipeline still runs end to end — drafts come from the deterministic template engine (`"source": "Template engine"` instead of `"NVIDIA NIM (RAG)"`). On first startup the API ingests `knowledge/kb.json` into pgvector using local ONNX embeddings (no key needed).
 
-```bash
-curl -s http://localhost:8080/api/complaints \
-  -H 'Content-Type: application/json' \
-  -d '{"text":"There are unauthorized fraud charges on my credit card and I will sue.",
-       "customerName":"A. Rao","complaintId":"CMP-1"}' | jq
-```
+**Try the full loop:** lodge a complaint on the portal (note the `TRK-…` tracking code) → open the case in the console → edit the reply to add an invented figure like `$999` → **Approve & send** gets blocked by the grounding gate with named issues → fix it, send, and watch the portal flip to *Responded* with an AI summary and the full reply.
 
-## Enable live LLM drafts (optional)
+## API
 
-Retrieval + drafting work without any key (template fallback). To get real NIM-generated, RAG-grounded replies, copy `.env.example` to `.env` and add your (rotated) NIM key:
+**Public** (rate-limited per IP):
 
-```bash
-cp .env.example .env      # then edit .env and set NIM_API_KEY=nvapi-...
-docker compose up -d --build api
-```
+- `POST /api/intake` — lodge a complaint → acknowledgement + `trackingToken`
+- `GET /api/status/{trackingToken}` — status; once responded: reply + summary + follow-up thread
 
-When a key is present, drafts come back with `"source": "NVIDIA NIM (RAG)"`; otherwise `"Template engine"`. On startup the API ingests `resources/knowledge/kb.json` into pgvector once (local embeddings, no key needed).
+**Operator** (require `X-API-Key`):
 
-## Run services individually
-
-**API** (needs JDK 21 + Maven):
-```bash
-cd api && ./mvnw spring-boot:run      # or: mvn spring-boot:run
-```
-Leave `CLASSIFIER_URL` unset to use the heuristic fallback, or point it at the classifier.
-
-**Classifier** (needs Python 3.11):
-```bash
-cd classifier
-pip install -r requirements.txt
-MODEL_DIR=../../models/complaint_classifier uvicorn main:app --port 8000
-```
-
-## API contract
-
-`POST /api/complaints`
-```json
-{ "text": "...", "customerName": "A. Rao", "complaintId": "CMP-1", "receivedAt": "2026-06-29T10:14:00" }
-```
-Returns `{ complaintId, prediction, compliance, draft, tasks, escalation }`. Every call is persisted to Postgres.
-
-Read endpoints (Week 3):
-- `GET /api/complaints/{id}` — a stored case plus its ordered audit trail
-- `GET /api/complaints` — the 50 most recent cases (audit view)
-- `GET /api/escalations` — only the cases flagged for senior review
+- `POST /api/complaints` — run the full pipeline on a case
+- `GET /api/complaints` · `GET /api/complaints/{id}` · `GET /api/escalations` — queue, case + audit trail + thread, escalations
+- `POST /api/complaints/{id}/approve` — verify + send; `422` with issues if the grounding check fails (`force: true` to override, audited); `409` once sent
+- `POST /api/complaints/{id}/follow-up` — append a verified correction/update to a sent case
+- `POST /api/eval` — fast, side-effect-free scoring endpoint for the eval harness
 
 ## Evaluation
 
@@ -126,25 +107,31 @@ The deterministic core is unit-tested (`mvn test`; runs on every CI push):
 
 ## Security
 
-The API enforces a security gate (`ApiKeyFilter` + `CorsConfig`):
+Defense in depth, documented in full in [SECURITY.md](SECURITY.md):
 
-- **Public:** `POST /api/intake`, `GET /api/status/{id}`, `/health`, `/actuator/health/**`.
-- **Protected** (require `X-API-Key`): all operator endpoints and `/actuator/metrics`.
-- **Rate-limited:** intake capped per client IP (default 20/min) to curb spam and LLM-cost abuse.
-- CORS restricted to the configured origin; complaint text size-capped (8 KB); error messages/stack traces suppressed; the API container runs as a non-root user; constant-time key comparison.
+- **Auth:** operator endpoints + `/actuator/metrics` behind `X-API-Key` (constant-time compare); only intake, status, and health are public.
+- **AI-output safety:** the grounding gate blocks invented figures, contacts, and template debris at draft *and* send time; overrides are audited.
+- **Data protection:** PII redaction + name tokenization before any external LLM call; 128-bit tracking tokens; retention purge job.
+- **Abuse resistance:** per-IP rate limits on intake (LLM-cost abuse) and status (token guessing); 8 KB input cap; suppressed stack traces; non-root containers.
+- **Supply chain:** gitleaks secret-scanning in CI (full history); Dependabot across Maven, pip, Actions, and Dockerfiles.
 
-Set `AEGIS_API_KEY` and `AEGIS_ALLOWED_ORIGINS` in `.env`; the operator console prompts for the key in its sidebar. **For production**, replace the shared key with real user auth (OAuth2/JWT), terminate TLS, and move secrets (NIM key, DB creds) into a secret manager.
+**For production:** replace the shared key with OAuth2/OIDC + roles, terminate TLS behind a WAF, and move secrets to a secret manager.
 
 ## CI
 
-`.github/workflows/ci.yml` runs on every push/PR to `main`: builds + tests the Java API, installs + syntax-checks the Python classifier, and builds both container images. A Cloud Run deploy job is scaffolded (commented) for when GCP is connected.
+`.github/workflows/ci.yml` on every push/PR to `main`: gitleaks secret scan → build + **unit-test** the Java API → check the Python classifier → build both container images. A Cloud Run deploy job is scaffolded (commented) for when GCP is connected.
 
 ## Deploy to Cloud Run
 
 ```bash
 PROJECT=your-project REGION=asia-south1 ./infra/deploy.sh
 ```
-Deploys the classifier (private) and the API (public, wired to the classifier URL). Move the NIM key + DB creds to Secret Manager before wiring the LLM (Week 7).
+
+Deploys the classifier (private) and the API (public, wired to the classifier URL). Move the NIM key + DB creds to Secret Manager first.
+
+## Roadmap
+
+Server-sent events for live portal updates (replacing polling) · OAuth2/OIDC with operator roles + maker-checker approval · distributed rate limiting · real email delivery (in + out) · operator-feedback learning loop (edits → retraining data) · hybrid retrieval (BM25 + reranker) with citation-pinned drafts · multilingual intake · case-intelligence dashboard · k6 load-test benchmarks.
 
 ## Contributing
 
@@ -155,9 +142,3 @@ Contributions are welcome — please read [CONTRIBUTING.md](CONTRIBUTING.md) and
 Released under the [MIT License](LICENSE) © 2026 Hemkesh.
 
 > **Disclaimer:** an educational / portfolio project — not legal or financial advice. The bundled regulation knowledge base is illustrative only. Do not process real customer PII without appropriate privacy and security controls.
-
-## Next (from the roadmap)
-
-- **Week 3 (done):** `AuditService` persists a `CaseRecord` + `AuditEvent` trail to Postgres, exposed via the read endpoints above.
-- **Weeks 4–5 (done):** Spring AI RAG — local ONNX embeddings + pgvector retrieval (`RagRetriever`, `IngestionService`) and NIM LLM drafting (`DraftService`), template as automatic fallback. Set `NIM_API_KEY` to enable live drafts.
-- **Week 7:** GitHub Actions CI/CD, Secret Manager, structured logging, RAG eval.
