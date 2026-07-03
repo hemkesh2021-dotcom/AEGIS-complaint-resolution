@@ -1,0 +1,20 @@
+[
+  {"text": "I found several charges on my credit card that I never authorized. This is clearly fraud and if it is not reversed I will contact my attorney and take legal action.", "expected_category": "Credit card", "expect_escalate": true},
+  {"text": "I was charged a $99 annual fee on my credit card and I would like an explanation of why it applies to my account.", "expected_category": "Credit card", "expect_escalate": false},
+  {"text": "My credit card was stolen and someone used it for fraudulent purchases at stores I have never visited.", "expected_category": "Credit card", "expect_escalate": true},
+  {"text": "My mortgage servicer misapplied my last two payments and my escrow account now shows a shortage that is not my fault.", "expected_category": "Mortgage", "expect_escalate": false},
+  {"text": "The bank is trying to foreclose on my home over a payment dispute. My lawyer says this is wrongful and we will sue.", "expected_category": "Mortgage", "expect_escalate": true},
+  {"text": "A debt collector calls me every day and has been threatening and abusive about a debt I already disputed.", "expected_category": "Debt collection", "expect_escalate": true},
+  {"text": "I received a debt collection letter for an amount I do not recognize and I would like it validated.", "expected_category": "Debt collection", "expect_escalate": false},
+  {"text": "My checking account was charged an overdraft fee even though I had a positive balance. Please review it.", "expected_category": "Checking or savings account", "expect_escalate": false},
+  {"text": "Someone made unauthorized withdrawals from my checking account. I believe my account was hacked and money was taken without my consent.", "expected_category": "Checking or savings account", "expect_escalate": true},
+  {"text": "There is an inaccurate late payment on my credit report that does not belong to me and I want it corrected.", "expected_category": "Credit reporting or other personal consumer reports", "expect_escalate": false},
+  {"text": "My student loan servicer placed me in the wrong repayment plan and has not processed my income-driven repayment application.", "expected_category": "Student loan", "expect_escalate": false},
+  {"text": "I sent a wire transfer to another bank a week ago and the money was never received by the recipient.", "expected_category": "Money transfer, virtual currency, or money service", "expect_escalate": false},
+  {"text": "The balance on my prepaid card disappeared and several transactions I did not make appeared overnight.", "expected_category": "Prepaid card", "expect_escalate": false},
+  {"text": "My elderly disabled father's car was wrongfully repossessed even though his auto loan payments were current.", "expected_category": "Vehicle loan or lease", "expect_escalate": true},
+  {"text": "I took out a payday loan and the APR and fees disclosed are not what I was told at signing.", "expected_category": "Payday loan, title loan, personal loan, or advance loan", "expect_escalate": false},
+  {"text": "My mortgage payment was posted to the wrong account and now I am being reported as late.", "expected_category": "Mortgage", "expect_escalate": false},
+  {"text": "A debt settlement company charged me fees but never contacted my creditors as promised.", "expected_category": "Debt or credit management", "expect_escalate": false},
+  {"text": "My credit report was accessed and someone opened accounts using my identity. This is identity theft and fraud.", "expected_category": "Credit reporting or other personal consumer reports", "expect_escalate": true}
+]

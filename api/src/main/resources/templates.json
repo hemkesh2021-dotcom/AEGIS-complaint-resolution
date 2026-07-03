@@ -1,0 +1,62 @@
+[
+  {
+    "category": "Checking or savings account",
+    "subject": "Re: Complaint {complaint_id} — Deposit Account Concern",
+    "body": "Dear {customer_name},\n\nThank you for contacting us about your checking or savings account. We have registered your complaint (ID {complaint_id}) and our team is reviewing the account activity you reported.\n\nUnder {clause}, we will investigate and provide a substantive update by {resolution_due}. If a provisional credit applies while we complete our review, we will advise you accordingly.\n\nRegards,\nCustomer Care Team"
+  },
+  {
+    "category": "Credit card",
+    "subject": "Re: Complaint {complaint_id} — Credit Card Concern",
+    "body": "Dear {customer_name},\n\nThank you for raising your credit card concern. Your complaint (ID {complaint_id}) has been logged and our team is reviewing the charges, fees, or statement entries you identified.\n\nIn line with {clause}, we will complete our billing-error review and respond by {resolution_due}. You are not required to pay the disputed amount while it is under investigation.\n\nRegards,\nCustomer Care Team"
+  },
+  {
+    "category": "Credit reporting or other personal consumer reports",
+    "subject": "Re: Complaint {complaint_id} — Credit Reporting Dispute",
+    "body": "Dear {customer_name},\n\nThank you for notifying us of a possible inaccuracy in your consumer report. We have recorded your dispute (ID {complaint_id}) and begun a reinvestigation of the information you identified.\n\nAs required by {clause}, we will complete our reinvestigation and share the results with you by {resolution_due}. Any information found to be inaccurate will be corrected or deleted.\n\nRegards,\nCustomer Care Team"
+  },
+  {
+    "category": "Debt collection",
+    "subject": "Re: Complaint {complaint_id} — Debt Collection Concern",
+    "body": "Dear {customer_name},\n\nThank you for contacting us regarding the debt collection matter. Your complaint (ID {complaint_id}) has been registered and collection activity on the disputed item is being reviewed.\n\nUnder {clause}, we will validate the debt and respond to your dispute by {resolution_due}. Please retain any related correspondence for our review.\n\nRegards,\nCustomer Care Team"
+  },
+  {
+    "category": "Debt or credit management",
+    "subject": "Re: Complaint {complaint_id} — Debt / Credit Management Concern",
+    "body": "Dear {customer_name},\n\nThank you for sharing your concern about your debt or credit-management service. We have logged your complaint (ID {complaint_id}) and our team is reviewing the details of your plan and payments.\n\nIn line with {clause}, we will provide an update by {resolution_due}.\n\nRegards,\nCustomer Care Team"
+  },
+  {
+    "category": "Money transfer, virtual currency, or money service",
+    "subject": "Re: Complaint {complaint_id} — Money Transfer Concern",
+    "body": "Dear {customer_name},\n\nThank you for reporting an issue with your money transfer or money service. Your complaint (ID {complaint_id}) has been registered and we are tracing the transaction you described.\n\nUnder {clause}, we will complete our error review and respond by {resolution_due}.\n\nRegards,\nCustomer Care Team"
+  },
+  {
+    "category": "Mortgage",
+    "subject": "Re: Complaint {complaint_id} — Mortgage Servicing Concern",
+    "body": "Dear {customer_name},\n\nThank you for contacting us about your mortgage. We acknowledge your complaint (ID {complaint_id}) and our servicing team is reviewing the escrow, payment, or modification matter you raised.\n\nAs required by {clause}, we will investigate and provide a written response by {resolution_due}.\n\nRegards,\nCustomer Care Team"
+  },
+  {
+    "category": "Payday loan, title loan, personal loan, or advance loan",
+    "subject": "Re: Complaint {complaint_id} — Loan Concern",
+    "body": "Dear {customer_name},\n\nThank you for raising your concern about your loan. Your complaint (ID {complaint_id}) has been logged and our team is reviewing the loan terms, charges, or payments you identified.\n\nIn line with {clause}, we will respond by {resolution_due}.\n\nRegards,\nCustomer Care Team"
+  },
+  {
+    "category": "Prepaid card",
+    "subject": "Re: Complaint {complaint_id} — Prepaid Card Concern",
+    "body": "Dear {customer_name},\n\nThank you for reporting an issue with your prepaid card. We have registered your complaint (ID {complaint_id}) and are reviewing the balance or transaction activity you reported.\n\nUnder {clause}, we will complete our error review and update you by {resolution_due}.\n\nRegards,\nCustomer Care Team"
+  },
+  {
+    "category": "Student loan",
+    "subject": "Re: Complaint {complaint_id} — Student Loan Servicing Concern",
+    "body": "Dear {customer_name},\n\nThank you for contacting us about your student loan. Your complaint (ID {complaint_id}) has been logged and our servicing team is reviewing the payment, deferment, or forbearance matter you raised.\n\nIn line with {clause}, we will investigate and respond by {resolution_due}.\n\nRegards,\nCustomer Care Team"
+  },
+  {
+    "category": "Vehicle loan or lease",
+    "subject": "Re: Complaint {complaint_id} — Vehicle Finance Concern",
+    "body": "Dear {customer_name},\n\nThank you for raising your concern about your vehicle loan or lease. We have registered your complaint (ID {complaint_id}) and are reviewing the account, payment, or repossession matter you described.\n\nUnder {clause}, we will respond by {resolution_due}.\n\nRegards,\nCustomer Care Team"
+  },
+  {
+    "category": "default",
+    "subject": "Re: Complaint {complaint_id}",
+    "body": "Dear {customer_name},\n\nWe acknowledge your complaint (ID {complaint_id}) regarding {category}. Our team is reviewing the matter and will provide an update by {resolution_due}.\n\nRegards,\nCustomer Care Team"
+  }
+]

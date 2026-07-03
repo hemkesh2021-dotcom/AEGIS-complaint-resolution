@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AEGIS Operator Console</title>
+<style>
+  :root{
+    --bg:#0C0A08; --bg-2:#0A0806;
+    --surface:rgba(255,250,240,.045); --surface-2:rgba(255,250,240,.07);
+    --border:rgba(240,207,142,.14); --border-strong:rgba(240,207,142,.28);
+    --text:#F2EDE4; --muted:#9A917F; --faint:#6E665A;
+    --gold:#DDB35A; --gold-2:#B8862F; --gold-hi:#F0CF8E; --on-gold:#2A1C04;
+    --ok:#5BBF92; --warn:#E08A3C; --danger:#E06B6B; --info:#7EC5DE;
+    --shadow:0 10px 40px rgba(8,5,2,.55); --radius:16px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  body::before,body::after{content:"";position:fixed;z-index:0;filter:blur(90px);opacity:.5;pointer-events:none}
+  body::before{width:520px;height:520px;left:-160px;top:-140px;background:radial-gradient(circle,rgba(221,179,90,.34),transparent 62%)}
+  body::after{width:620px;height:620px;right:-220px;bottom:-220px;background:radial-gradient(circle,rgba(184,134,47,.26),transparent 62%)}
+  .layout{position:relative;z-index:1;display:grid;grid-template-columns:264px 1fr;min-height:100vh}
+  aside{padding:22px 18px;border-right:1px solid var(--border);position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:16px;background:linear-gradient(180deg,rgba(255,250,240,.03),transparent)}
+  .brand{display:flex;align-items:center;gap:10px;font-size:19px;font-weight:700}
+  .brand .mark{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,var(--gold-hi),var(--gold-2));box-shadow:0 4px 16px rgba(221,179,90,.35)}
+  .brand small{display:block;font-size:11px;font-weight:500;color:var(--muted);margin-top:1px}
+  nav{display:flex;flex-direction:column;gap:4px;margin-top:2px}
+  .navbtn{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:11px;border:1px solid transparent;color:var(--muted);cursor:pointer;font-size:14px;font-weight:500;transition:.16s;background:none;text-align:left;width:100%}
+  .navbtn:hover{background:var(--surface);color:var(--text)}
+  .navbtn.active{background:linear-gradient(135deg,rgba(221,179,90,.16),rgba(184,134,47,.08));border-color:var(--border-strong);color:var(--text)}
+  .navbtn.active svg{color:var(--gold)}
+  .navbtn .cnt{margin-left:auto;font-size:11px;font-weight:700;background:rgba(224,107,107,.18);color:var(--danger);border-radius:20px;padding:1px 8px;min-width:20px;text-align:center}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px}
+  .status-title{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:9px}
+  .status-row{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);padding:3px 0}
+  .dot{width:8px;height:8px;border-radius:50%;flex:none}
+  .dot.green{background:var(--ok);box-shadow:0 0 8px rgba(91,191,146,.7)}
+  .dot.amber{background:var(--warn)} .dot.grey{background:var(--faint)}
+  aside .spacer{flex:1}
+  .settings{font-size:11.5px;color:var(--faint)}
+  .settings input{width:100%;margin-top:6px;background:var(--bg-2);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 8px;font-size:11.5px}
+  main{padding:26px 32px 60px;max-width:1140px}
+  .hero h1{font-size:22px;margin:0 0 3px;font-weight:650}
+  .hero h1 b{background:linear-gradient(135deg,var(--gold-hi),var(--gold-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p{color:var(--muted);margin:0 0 22px;font-size:13.5px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;backdrop-filter:blur(10px);box-shadow:var(--shadow)}
+  .card.full{grid-column:1/-1}
+  .card h3{margin:0 0 12px;font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--gold);display:flex;align-items:center;gap:8px;font-weight:700}
+  label{display:block;font-size:12px;color:var(--muted);margin:12px 0 6px}
+  textarea,input[type=text],select{width:100%;background:var(--bg-2);color:var(--text);border:1px solid var(--border);border-radius:11px;padding:12px 13px;font-size:14px;font-family:inherit;transition:.16s}
+  textarea:focus,input:focus,select:focus{outline:none;border-color:var(--border-strong);box-shadow:0 0 0 3px rgba(221,179,90,.12)}
+  textarea{min-height:130px;resize:vertical}
+  .two{display:flex;gap:12px}.two>div{flex:1}
+  .btn{margin-top:16px;width:100%;padding:13px;border:none;border-radius:12px;cursor:pointer;font-size:15px;font-weight:650;background:linear-gradient(135deg,var(--gold-hi),var(--gold-2));color:var(--on-gold);transition:.16s;display:flex;align-items:center;justify-content:center;gap:8px}
+  .btn:hover{filter:brightness(1.06);box-shadow:0 8px 24px rgba(221,179,90,.3)}
+  .btn:disabled{opacity:.6;cursor:default;filter:none;box-shadow:none}
+  .btn.ghost{background:var(--surface);color:var(--text);border:1px solid var(--border);font-weight:500;font-size:13px}
+  .toolbar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+  .filterchip{font-size:12.5px;padding:6px 13px;border-radius:20px;border:1px solid var(--border);color:var(--muted);cursor:pointer;background:none;transition:.14s}
+  .filterchip:hover{color:var(--text)}
+  .filterchip.active{background:linear-gradient(135deg,rgba(221,179,90,.18),rgba(184,134,47,.08));border-color:var(--border-strong);color:var(--text);font-weight:600}
+  .filterchip.active.crit{background:rgba(224,107,107,.14);border-color:rgba(224,107,107,.4);color:var(--danger)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;color:var(--faint);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:8px 10px;border-bottom:1px solid var(--border)}
+  td{padding:11px 10px;border-bottom:1px solid var(--border)}
+  tr.clickable{cursor:pointer;transition:.14s}tr.clickable:hover{background:var(--surface)}
+  tr.sel{background:rgba(221,179,90,.09)}
+  .chip{font-size:12px;padding:4px 11px;border-radius:20px;border:1px solid var(--border);color:var(--muted)}
+  .chip.risk{color:var(--danger);border-color:rgba(224,107,107,.5);background:rgba(224,107,107,.08)}
+  .chip.ok{color:var(--ok);border-color:rgba(91,191,146,.45);background:rgba(91,191,146,.08)}
+  .chip.gold{color:var(--gold-hi);border-color:var(--border-strong)}
+  .banner{border-radius:12px;padding:12px 15px;font-weight:600;font-size:14px;display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .banner.esc{background:rgba(224,107,107,.12);color:var(--danger);border:1px solid rgba(224,107,107,.4)}
+  .banner.ok{background:rgba(91,191,146,.1);color:var(--ok);border:1px solid rgba(91,191,146,.35)}
+  .metric{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}.metric b{font-size:22px;font-weight:650}
+  .conf{margin-top:10px;height:8px;border-radius:6px;background:var(--border);overflow:hidden}
+  .conf>div{height:100%;background:linear-gradient(90deg,var(--gold-2),var(--gold-hi))}
+  .kv{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13.5px}
+  .kv:last-child{border:none}.kv .k{color:var(--muted)}.kv .v{font-weight:500;text-align:right}
+  .chips{margin-top:10px;display:flex;flex-wrap:wrap;gap:7px}
+  .email{background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .email .subj{font-weight:600;font-size:14.5px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+  .email .body{white-space:pre-wrap;font-size:13.5px;color:#E7E0D3;max-height:320px;overflow:auto;line-height:1.6}
+  .srcbadge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;margin-left:auto}
+  .srcbadge.nim{color:var(--ok);background:rgba(91,191,146,.12);border:1px solid rgba(91,191,146,.4)}
+  .srcbadge.tpl{color:var(--warn);background:rgba(224,138,60,.1);border:1px solid rgba(224,138,60,.35)}
+  .badge{font-size:11px;font-weight:650;padding:4px 10px;border-radius:8px;flex:none}
+  .badge.crit{background:rgba(224,107,107,.16);color:var(--danger)}.badge.high{background:rgba(224,138,60,.16);color:var(--warn)}.badge.med{background:rgba(221,179,90,.14);color:var(--gold-hi)}
+  .task{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)}.task:last-child{border:none}
+  .task .t{font-size:14px;font-weight:500}.task .m{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .empty{color:var(--muted);font-size:14px;text-align:center;padding:40px 10px}
+  .spin{width:15px;height:15px;border:2px solid rgba(42,28,4,.35);border-top-color:var(--on-gold);border-radius:50%;animation:sp .7s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .fade{animation:fade .4s ease both}@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .back{color:var(--muted);cursor:pointer;font-size:13px;font-weight:500;margin-right:10px}.back:hover{color:var(--gold)}
+  .wshead{display:flex;align-items:center;gap:10px;margin:20px 0 4px;flex-wrap:wrap}
+  .wstitle{font-size:17px;font-weight:650}
+  .stepper{display:flex;justify-content:space-between;position:relative;margin:6px 4px 8px;padding-top:6px}
+  .stepper .rail{position:absolute;top:24px;left:6%;right:6%;height:2px;background:var(--border)}
+  .stepper .fill{position:absolute;top:24px;left:6%;height:2px;width:0;background:linear-gradient(90deg,var(--gold),var(--gold-hi));transition:width .5s ease}
+  .step{display:flex;flex-direction:column;align-items:center;gap:7px;z-index:1;flex:1}
+  .node{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:var(--bg-2);border:1px solid var(--border);color:var(--faint);transition:.35s}
+  .node.done{background:linear-gradient(135deg,var(--gold-hi),var(--gold-2));border-color:transparent;color:var(--on-gold)}
+  .node.active{border-color:var(--gold);color:var(--gold);animation:pulse 1s infinite}
+  .node.esc{background:linear-gradient(135deg,#E88,#E06B6B);border-color:transparent;color:#2a0808}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(221,179,90,.4)}50%{box-shadow:0 0 0 7px rgba(221,179,90,0)}}
+  .step span{font-size:10.5px;color:var(--muted);text-align:center;max-width:74px;line-height:1.25}
+  .tl{position:relative;padding-left:22px;margin-top:6px}
+  .tl::before{content:"";position:absolute;left:5px;top:4px;bottom:4px;width:2px;background:var(--border)}
+  .tl .ev{position:relative;padding:8px 0 8px 4px}
+  .tl .ev::before{content:"";position:absolute;left:-21px;top:12px;width:10px;height:10px;border-radius:50%;background:var(--gold);border:2px solid var(--bg)}
+  .tl .ph{font-size:12px;font-weight:600;color:var(--gold-hi);text-transform:capitalize}.tl .dt{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .hide{display:none}
+  @media(max-width:820px){.layout{grid-template-columns:1fr}aside{position:static;height:auto}.grid{grid-template-columns:1fr}main{padding:20px 16px}}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <div class="brand"><span class="mark"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#2A1C04" stroke-width="2.2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/></svg></span><span>AEGIS<small>Operator Console</small></span></div>
+    <nav>
+      <button class="navbtn active" data-tab="queue"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Review queue<span class="cnt hide" id="qCount">0</span></button>
+      <button class="navbtn" data-tab="esc"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l9 16H3z"/><path d="M12 9v5M12 17v.5"/></svg>Escalations</button>
+      <button class="navbtn" data-tab="new"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New case</button>
+    </nav>
+    <div class="panel">
+      <div class="status-title">System status</div>
+      <div class="status-row"><span id="apiDot" class="dot grey"></span> <span id="apiTxt">Checking API…</span></div>
+      <div class="status-row"><span class="dot green"></span> DistilBERT · 11 categories</div>
+      <div class="status-row"><span class="dot green"></span> pgvector knowledge base</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="settings">API endpoint<input id="apiBase" type="text" value="http://localhost:8080" /></div>
+    <div class="settings" style="margin-top:8px">Operator API key<input id="apiKey" type="password" placeholder="X-API-Key" autocomplete="off" /></div>
+  </aside>
+
+  <main>
+    <div class="hero">
+      <h1>Operator <b>Console</b></h1>
+      <p>Work the queue by urgency → open a case → review the AI analysis and drafted reply → approve &amp; send.</p>
+    </div>
+
+    <!-- QUEUE -->
+    <section id="tab-queue">
+      <div class="toolbar" id="filters">
+        <button class="filterchip active" data-f="review">Needs review</button>
+        <button class="filterchip" data-f="escalated">Escalated</button>
+        <button class="filterchip" data-f="sent">Sent</button>
+        <button class="filterchip" data-f="all">All</button>
+        <button class="btn ghost" style="margin:0 0 0 auto;width:auto;padding:7px 12px" onclick="loadQueue()">Refresh</button>
+      </div>
+      <div class="card full"><div id="queueBody"><div class="empty">Loading…</div></div></div>
+      <div id="workspace"></div>
+    </section>
+
+    <!-- ESCALATIONS -->
+    <section id="tab-esc" class="hide">
+      <div class="card full"><h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l9 16H3z"/><path d="M12 9v5M12 17v.5"/></svg>Flagged for senior review
+        <button class="btn ghost" style="margin:0 0 0 auto;width:auto;padding:7px 12px" onclick="loadEsc()">Refresh</button></h3>
+        <div id="escBody"><div class="empty">Loading…</div></div></div>
+    </section>
+
+    <!-- NEW CASE -->
+    <section id="tab-new" class="hide">
+      <div class="grid">
+        <div class="card"><h3>Run a complaint (testing)</h3>
+          <label>Load an example</label><select id="ex" onchange="loadExample()"></select>
+          <label>Complaint narrative</label><textarea id="text"></textarea>
+          <div class="two"><div><label>Customer</label><input id="cust" type="text" value="A. Rao"/></div>
+            <div><label>Case ID (optional)</label><input id="cid" type="text" placeholder="auto"/></div></div>
+          <button class="btn" id="run" onclick="runPipeline()"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M13 2L4 14h6l-1 8 9-12h-6z"/></svg>Run AEGIS Pipeline</button>
+        </div>
+        <div class="card"><h3>Pipeline</h3><div class="stepper" id="stepper"></div>
+          <div id="pipeHint" class="empty" style="padding:14px 6px">Run a complaint to watch the six phases execute.</div></div>
+      </div>
+      <div id="results"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+const PHASES=["Ingest","Classify","Compliance","Retrieve + draft","Tasks","Escalation"];
+const EXAMPLES=[
+  {name:"Credit-card fraud (escalates)",cust:"A. Rao",text:"I noticed three charges on my credit card last week that I never authorized — $420 total to a merchant I have never heard of. I reported my card as compromised but nothing has been reversed. This looks like fraud and if it is not fixed I will consider legal action."},
+  {name:"Mortgage escrow error",cust:"J. Mensah",text:"My mortgage servicer misapplied my last two payments and my escrow account is now showing a shortage that is not my fault. I have called three times with no resolution."},
+  {name:"Debt collection harassment",cust:"L. Petrov",text:"A debt collector keeps calling me every day, sometimes five times, about a debt I already disputed. They have been threatening and abusive on the phone."},
+  {name:"ATM cash not dispensed",cust:"M. Silva",text:"I tried to withdraw 200 dollars from an ATM and the machine debited my checking account but did not dispense any cash. It has been a week and the money has not been credited back."},
+  {name:"Student loan servicing",cust:"D. Kim",text:"My student loan servicer put me in the wrong repayment plan and has not processed my income-driven repayment application that I submitted two months ago."}
+];
+const $=s=>document.querySelector(s), api=()=>$("#apiBase").value.replace(/\/$/,"");
+const KEY=()=>(($("#apiKey")&&$("#apiKey").value)||localStorage.getItem("aegisKey")||"");
+function apiFetch(u,o){o=o||{};o.headers=Object.assign({"X-API-Key":KEY()},o.headers||{});return fetch(u,o);}
+let FILTER="review", SELECTED=null;
+
+function esc(s){return (s==null?"":String(s)).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function fmt(iso){if(!iso)return"—";const d=new Date(iso);if(isNaN(d))return esc(iso);return d.toLocaleString("en-US",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}
+function badgeCls(p){p=(p||"").toLowerCase();return p==="critical"?"crit":p==="high"?"high":"med"}
+function urgencyChip(u){u=u||"NORMAL";const cls=u==="CRITICAL"?"risk":u==="PRIORITIZED"?"gold":"ok";return `<span class="chip ${cls}">${esc(u)}</span>`}
+function statusChip(s){return s==="SENT"?'<span class="chip ok">Sent</span>':'<span class="chip gold">In review</span>'}
+const uRank=u=>({CRITICAL:0,PRIORITIZED:1,NORMAL:2}[u]??3);
+
+// examples + tabs
+EXAMPLES.forEach((e,i)=>{const o=document.createElement("option");o.value=i;o.textContent=e.name;$("#ex").appendChild(o)});
+function loadExample(){const e=EXAMPLES[$("#ex").value];if(!e)return;$("#text").value=e.text;$("#cust").value=e.cust}
+loadExample();
+function activate(t){document.querySelectorAll(".navbtn").forEach(x=>x.classList.toggle("active",x.dataset.tab===t));
+  ["queue","esc","new"].forEach(x=>$("#tab-"+x).classList.toggle("hide",x!==t));
+  if(t==="queue")loadQueue(); if(t==="esc")loadEsc();}
+document.querySelectorAll(".navbtn").forEach(b=>b.onclick=()=>activate(b.dataset.tab));
+document.querySelectorAll(".filterchip").forEach(b=>b.onclick=()=>{FILTER=b.dataset.f;
+  document.querySelectorAll(".filterchip").forEach(x=>{x.classList.toggle("active",x===b);x.classList.toggle("crit",x===b&&b.dataset.f==="escalated")});
+  loadQueue();});
+
+// ── queue ──
+async function loadQueue(){
+  const b=$("#queueBody");
+  if(!KEY()){b.innerHTML='<div class="empty">Enter your operator API key in the sidebar to load the queue.</div>';$("#qCount").classList.add("hide");return;}
+  try{
+    let rows=await (await apiFetch(api()+"/api/complaints")).json();
+    const pending=rows.filter(c=>c.status!=="SENT").length;
+    const cnt=$("#qCount");cnt.textContent=pending;cnt.classList.toggle("hide",pending===0);
+    let view=rows;
+    if(FILTER==="review")view=rows.filter(c=>c.status!=="SENT");
+    else if(FILTER==="escalated")view=rows.filter(c=>c.escalate);
+    else if(FILTER==="sent")view=rows.filter(c=>c.status==="SENT");
+    view.sort((a,b)=>uRank(a.urgency)-uRank(b.urgency)||(a.createdAt<b.createdAt?1:-1));
+    if(!view.length){b.innerHTML='<div class="empty">Nothing here. Try another filter, or run a case from “New case”.</div>';return;}
+    b.innerHTML=`<table><thead><tr><th>Case</th><th>Category</th><th>Urgency</th><th>Status</th><th>Conf.</th><th>When</th></tr></thead><tbody>${
+      view.map(c=>`<tr class="clickable ${c.complaintId===SELECTED?'sel':''}" onclick="openCase('${esc(c.complaintId)}')">
+        <td style="font-weight:600">${esc(c.complaintId)}</td><td>${esc(c.category)}</td>
+        <td>${urgencyChip(c.urgency)}</td><td>${statusChip(c.status)}</td>
+        <td>${Math.round((c.confidence||0)*100)}%</td><td style="color:var(--muted)">${fmt(c.createdAt)}</td></tr>`).join("")}</tbody></table>`;
+  }catch(e){b.innerHTML=`<div class="empty">Couldn't load the queue (${esc(e.message)}). Is the API reachable?</div>`}
+}
+
+// ── review workspace ──
+async function openCase(id){
+  SELECTED=id; activate("queue");
+  document.querySelectorAll("#queueBody tr").forEach(tr=>tr.classList.remove("sel"));
+  const el=$("#workspace");el.innerHTML='<div class="card full fade" style="margin-top:18px"><div class="empty">Loading case…</div></div>';
+  try{
+    const d=await (await apiFetch(api()+"/api/complaints/"+encodeURIComponent(id))).json();
+    const c=d.caseRecord, sent=c.status==="SENT", conf=Math.round((c.confidence||0)*100);
+    const flags=(c.riskFlags?c.riskFlags.split(","):[]).filter(Boolean);
+    const tl=(d.auditTrail||[]).map(e=>`<div class="ev"><div class="ph">${esc(e.phase)}</div><div class="dt">${esc(e.detail)}</div><div class="dt" style="color:var(--faint)">${fmt(e.createdAt)}</div></div>`).join("");
+    el.innerHTML=`
+      <div class="wshead"><span class="back" onclick="closeWorkspace()">← Queue</span>
+        <span class="wstitle">${esc(c.complaintId)}</span> ${urgencyChip(c.urgency)} ${statusChip(c.status)}</div>
+      ${c.escalate?`<div class="banner esc">⬆ ${esc(c.escalationLevel||"Senior Review")} — ${esc(c.escalationReason)}</div>`:`<div class="banner ok">✓ Normal flow — no risk flags</div>`}
+      <div class="grid fade">
+        <div class="card"><h3>Complaint &amp; analysis</h3>
+          <div class="email"><div class="body" style="max-height:150px">${esc(c.complaintText)}</div></div>
+          <div class="kv" style="margin-top:12px"><span class="k">Category</span><span class="v">${esc(c.category)} · ${conf}%</span></div>
+          <div class="conf"><div style="width:${conf}%"></div></div>
+          <div class="kv"><span class="k">Clause</span><span class="v" style="max-width:58%">${esc(c.clause)}</span></div>
+          <div class="kv"><span class="k">Acknowledge by</span><span class="v">${fmt(c.ackDue)}</span></div>
+          <div class="kv"><span class="k">Resolve by</span><span class="v">${fmt(c.resolutionDue)}</span></div>
+          <div class="chips">${flags.map(f=>`<span class="chip risk">⚠ ${esc(f)}</span>`).join("")||'<span class="chip ok">✓ no risk flags</span>'}</div></div>
+        <div class="card"><h3>Resolution ${sent?'<span class="srcbadge nim">Sent ✓</span>':'<span class="srcbadge tpl">Pending approval</span>'}</h3>
+          ${sent
+            ?`<div class="email"><div class="subj">${esc(c.finalSubject||c.draftSubject)}</div><div class="body">${esc(c.finalBody||c.draftBody)}</div></div>`
+            :`<label>Subject</label><input id="apSubj" type="text" value="${esc(c.draftSubject||"")}"/>
+              <label>Reply — edit before sending</label>
+              <textarea id="apBody" style="min-height:240px">${esc(c.draftBody||"")}</textarea>
+              <button class="btn" onclick="approveCase('${esc(c.complaintId)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>Approve &amp; send</button>`}</div>
+        <div class="card full"><h3>Audit trail</h3><div class="tl">${tl||'<div class="empty">No events.</div>'}</div></div>
+      </div>`;
+    el.scrollIntoView({behavior:"smooth",block:"start"});
+    document.querySelectorAll("#queueBody tr").forEach(tr=>tr.classList.toggle("sel",tr.textContent.includes(id)));
+  }catch(e){el.innerHTML=`<div class="card full" style="margin-top:18px"><div class="empty">${esc(e.message)}</div></div>`}
+}
+function closeWorkspace(){SELECTED=null;$("#workspace").innerHTML="";loadQueue()}
+async function approveCase(id){
+  const btn=event&&event.target.closest("button");if(btn){btn.disabled=true;btn.innerHTML='<span class="spin"></span> Sending…';}
+  const subj=($("#apSubj")||{}).value||"", body=($("#apBody")||{}).value||"";
+  try{
+    const r=await apiFetch(api()+"/api/complaints/"+encodeURIComponent(id)+"/approve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subject:subj,body:body})});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    await openCase(id); loadQueue();
+  }catch(e){alert("Approve failed: "+e.message);}
+}
+
+// ── escalations ──
+async function loadEsc(){
+  const b=$("#escBody");b.innerHTML='<div class="empty">Loading…</div>';
+  try{
+    let rows=await (await apiFetch(api()+"/api/escalations")).json();
+    rows.sort((a,b)=>uRank(a.urgency)-uRank(b.urgency));
+    if(!rows.length){b.innerHTML='<div class="empty">No escalated cases. 🎉</div>';return;}
+    b.innerHTML=rows.map(c=>`<div class="banner ${c.status==='SENT'?'ok':'esc'}" style="margin-bottom:10px">
+      <div style="flex:1"><b>${esc(c.complaintId)}</b> · ${esc(c.category)} ${urgencyChip(c.urgency)} ${statusChip(c.status)}
+        <div style="font-weight:400;font-size:12.5px;margin-top:3px;color:var(--muted)">${esc(c.escalationReason)}</div></div>
+      <button class="btn ghost" style="margin:0;width:auto;padding:7px 14px" onclick="openCase('${esc(c.complaintId)}')">Review →</button></div>`).join("");
+  }catch(e){b.innerHTML=`<div class="empty">Couldn't load (${esc(e.message)}).</div>`}
+}
+
+// ── new case (manual run) ──
+function renderStepper(state){
+  const s=$("#stepper");let html='<div class="rail"></div>';
+  let fill=state==="run"?46:(typeof state==="object"?100:0);
+  html+=`<div class="fill" style="width:${fill*0.88}%"></div>`;
+  PHASES.forEach((p,i)=>{let cls="node";
+    if(state==="run")cls+=i<=2?" done":i===3?" active":"";
+    else if(typeof state==="object"){cls+=" done";if(i===5&&state.escalation&&state.escalation.escalate)cls="node esc";}
+    html+=`<div class="step"><div class="${cls}">${i+1}</div><span>${p}</span></div>`;});
+  s.innerHTML=html;
+}
+renderStepper("idle");
+async function runPipeline(){
+  const btn=$("#run"),txt=$("#text").value.trim();if(!txt){$("#text").focus();return;}
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span> Running…';$("#pipeHint").classList.add("hide");renderStepper("run");
+  $("#results").innerHTML='<div class="card full" style="margin-top:16px"><div class="empty"><span class="spin" style="display:inline-block;border-color:rgba(221,179,90,.3);border-top-color:var(--gold)"></span><div style="margin-top:10px">Processing — the LLM draft can take 20–30s on first run.</div></div></div>';
+  try{
+    const r=await apiFetch(api()+"/api/complaints",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({text:txt,customerName:$("#cust").value,complaintId:$("#cid").value||null,channel:"CONSOLE",receivedAt:new Date().toISOString().slice(0,19)})});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const d=await r.json();renderStepper(d);
+    const conf=Math.round((d.prediction.confidence||0)*100);
+    $("#results").innerHTML=`<div class="card full fade" style="margin-top:16px">
+      <div class="metric"><b>${esc(d.prediction.label)}</b><span class="chip gold">${conf}%</span>${urgencyChip(d.urgency)}
+        ${d.escalation.escalate?'<span class="chip risk">⬆ '+esc(d.escalation.level)+'</span>':'<span class="chip ok">Normal</span>'}</div>
+      <div style="color:var(--muted);font-size:13px;margin-top:8px">${esc(d.escalation.reason)}</div>
+      <button class="btn" style="margin-top:16px" onclick="openCase('${esc(d.complaintId)}')">Review &amp; approve ${esc(d.complaintId)} →</button></div>`;
+    checkStatus();
+  }catch(e){renderStepper("idle");$("#results").innerHTML=`<div class="card full" style="margin-top:16px"><h3>Error</h3><div class="empty">${esc(e.message)} — is the API reachable at ${esc(api())}?</div></div>`;}
+  finally{btn.disabled=false;btn.innerHTML='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M13 2L4 14h6l-1 8 9-12h-6z"/></svg>Run AEGIS Pipeline';}
+}
+
+// ── status ──
+async function checkStatus(){
+  try{const r=await apiFetch(api()+"/health");if(r.ok){$("#apiDot").className="dot green";$("#apiTxt").textContent="API online";}else throw 0;}
+  catch{$("#apiDot").className="dot amber";$("#apiTxt").textContent="API unreachable";}
+}
+$("#apiBase").addEventListener("change",()=>{checkStatus();loadQueue()});
+$("#apiKey").value=localStorage.getItem("aegisKey")||"";
+$("#apiKey").addEventListener("change",()=>{localStorage.setItem("aegisKey",$("#apiKey").value);loadQueue();});
+checkStatus();loadQueue();
+</script>
+</body>
+</html>

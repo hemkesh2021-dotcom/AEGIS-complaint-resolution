@@ -1,0 +1,65 @@
+# Local end-to-end dev: classifier + API (+ Postgres/pgvector ready for Week 3).
+#
+#   docker compose up --build
+#   API        → http://localhost:8080
+#   Classifier → http://localhost:8000/health
+#   Frontend   → open frontend/index.html in a browser (API base = http://localhost:8080)
+#
+# The classifier reuses your v1 trained model via the ../models mount.
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: aegis
+      POSTGRES_PASSWORD: aegis
+      POSTGRES_DB: aegis
+    ports:
+      - "5432:5432"
+    volumes:
+      - aegis_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegis -d aegis"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  classifier:
+    build: ./classifier
+    environment:
+      MODEL_DIR: /models/complaint_classifier
+    volumes:
+      - ../models:/models:ro   # reuse the v1 fine-tuned DistilBERT
+    ports:
+      - "8000:8000"
+
+  api:
+    build: ./api
+    environment:
+      CLASSIFIER_URL: http://classifier:8000
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/aegis
+      SPRING_DATASOURCE_USERNAME: aegis
+      SPRING_DATASOURCE_PASSWORD: aegis
+      # LLM drafting via NVIDIA NIM. Unset = template fallback (retrieval still works).
+      NIM_API_KEY: ${NIM_API_KEY:-nvapi-not-set}
+      NIM_CHAT_MODEL: ${NIM_CHAT_MODEL:-openai/gpt-oss-120b}
+      AEGIS_API_KEY: ${AEGIS_API_KEY:-aegis-dev-key-change-me}
+      AEGIS_ALLOWED_ORIGINS: ${AEGIS_ALLOWED_ORIGINS:-http://localhost:8088}
+    ports:
+      - "8080:8080"
+    depends_on:
+      classifier:
+        condition: service_started
+      db:
+        condition: service_healthy
+
+  web:
+    image: nginx:alpine
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    ports:
+      - "8088:80"
+    depends_on:
+      - api
+
+volumes:
+  aegis_pgdata:

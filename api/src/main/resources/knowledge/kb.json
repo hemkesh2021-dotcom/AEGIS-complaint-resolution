@@ -1,0 +1,67 @@
+[
+  {
+    "id": "reg-e-deposit",
+    "category": "Checking or savings account",
+    "text": "Regulation E (Electronic Fund Transfer Act) governs errors on checking and savings accounts. The bank must investigate a reported error and generally resolve it within 10 business days, or provide provisional credit and take up to 45 days. Unauthorized electronic transfers reported promptly limit the customer's liability."
+  },
+  {
+    "id": "reg-z-creditcard",
+    "category": "Credit card",
+    "text": "Regulation Z and the Fair Credit Billing Act cover credit-card billing errors, including unauthorized charges and disputed transactions. The issuer must acknowledge a written billing-error notice within 30 days and resolve it within two billing cycles (no later than 90 days). The customer is not required to pay the disputed amount while it is under investigation."
+  },
+  {
+    "id": "fcra-reporting",
+    "category": "Credit reporting or other personal consumer reports",
+    "text": "Under the Fair Credit Reporting Act (FCRA) Section 611, a consumer-reporting agency must reinvestigate disputed information, usually within 30 days. Information that cannot be verified or is found inaccurate must be corrected or deleted, and the consumer must be notified of the results."
+  },
+  {
+    "id": "fdcpa-collection",
+    "category": "Debt collection",
+    "text": "The Fair Debt Collection Practices Act (FDCPA) governs third-party debt collection. On dispute, the collector must send validation of the debt and cease collection until the debt is verified. Harassment, threats, and abusive contact are prohibited and are high-risk indicators requiring escalation."
+  },
+  {
+    "id": "debt-credit-mgmt",
+    "category": "Debt or credit management",
+    "text": "Debt- and credit-management complaints concern debt settlement, credit repair, and counseling services. Firms must handle disputes about fees, enrolled accounts, and payment application, and provide a timely, documented response to the customer."
+  },
+  {
+    "id": "reg-e-remittance",
+    "category": "Money transfer, virtual currency, or money service",
+    "text": "Regulation E's remittance-transfer rule covers money transfers and money services. Providers must investigate errors such as funds not received or incorrect amounts, typically resolving within 90 days, and give remedies including refunds or resending the transfer."
+  },
+  {
+    "id": "respa-mortgage",
+    "category": "Mortgage",
+    "text": "RESPA (Regulation X) governs mortgage servicing. A servicer must acknowledge a notice of error within 5 business days and respond substantively within 30 business days (extendable by 15). Common issues include escrow, misapplied payments, and loss-mitigation or modification handling."
+  },
+  {
+    "id": "tila-smallloan",
+    "category": "Payday loan, title loan, personal loan, or advance loan",
+    "text": "Small-dollar and installment loans are covered by the Truth in Lending Act (TILA) disclosure rules. Complaints typically involve APR and fee disclosure, payment application, rollovers, and collection. Resolve disputes about terms and charges with clear documentation."
+  },
+  {
+    "id": "reg-e-prepaid",
+    "category": "Prepaid card",
+    "text": "Regulation E's prepaid-account rule extends error-resolution and liability-limit protections to prepaid cards. The provider must investigate reported errors on balances and transactions and issue provisional credit where applicable, similar to deposit-account timelines."
+  },
+  {
+    "id": "student-loan-servicing",
+    "category": "Student loan",
+    "text": "Student-loan servicing complaints involve payment application, deferment and forbearance, income-driven repayment, and forgiveness processing. Servicers must respond to disputes and correct servicing errors, providing a documented resolution to the borrower."
+  },
+  {
+    "id": "vehicle-finance",
+    "category": "Vehicle loan or lease",
+    "text": "Vehicle loan and lease complaints involve payoff and payment application, add-on products, and repossession. Servicers should investigate disputes about the account and provide remedies; wrongful-repossession claims are high-risk and warrant escalation."
+  },
+  {
+    "id": "precedent-unauth-card",
+    "category": "Credit card",
+    "text": "Precedent: A customer reported multiple unauthorized charges as fraud. The issuer opened a billing-error investigation under Reg Z, removed the disputed amounts pending review, issued a new card, and closed the case within the required cycle. Fraud and legal-action language triggered senior review."
+  },
+  {
+    "id": "precedent-atm-nondispense",
+    "category": "Checking or savings account",
+    "text": "Precedent: A customer's ATM withdrawal was debited but cash was not dispensed. Under Reg E, the bank investigated the switch and terminal logs, issued provisional credit within 10 business days, and made the credit final after confirming the discrepancy."
+  }
+]

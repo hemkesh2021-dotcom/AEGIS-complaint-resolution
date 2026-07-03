@@ -1,0 +1,79 @@
+[
+  {
+    "category": "Checking or savings account",
+    "ack_days": 2,
+    "resolution_days": 10,
+    "clause": "Reg E (Electronic Fund Transfer Act) error-resolution procedures",
+    "escalation_threshold_days": 3
+  },
+  {
+    "category": "Credit card",
+    "ack_days": 5,
+    "resolution_days": 30,
+    "clause": "Reg Z / Fair Credit Billing Act billing-error resolution",
+    "escalation_threshold_days": 5
+  },
+  {
+    "category": "Credit reporting or other personal consumer reports",
+    "ack_days": 5,
+    "resolution_days": 30,
+    "clause": "FCRA Section 611 dispute reinvestigation (30-day rule)",
+    "escalation_threshold_days": 5
+  },
+  {
+    "category": "Debt collection",
+    "ack_days": 5,
+    "resolution_days": 30,
+    "clause": "FDCPA debt validation and dispute handling",
+    "escalation_threshold_days": 3
+  },
+  {
+    "category": "Debt or credit management",
+    "ack_days": 3,
+    "resolution_days": 15,
+    "clause": "Debt and credit-management complaint handling policy",
+    "escalation_threshold_days": 3
+  },
+  {
+    "category": "Money transfer, virtual currency, or money service",
+    "ack_days": 2,
+    "resolution_days": 10,
+    "clause": "Reg E remittance-transfer / electronic fund transfer error resolution",
+    "escalation_threshold_days": 3
+  },
+  {
+    "category": "Mortgage",
+    "ack_days": 5,
+    "resolution_days": 30,
+    "clause": "RESPA (Reg X) notice-of-error and servicing response duties",
+    "escalation_threshold_days": 5
+  },
+  {
+    "category": "Payday loan, title loan, personal loan, or advance loan",
+    "ack_days": 3,
+    "resolution_days": 15,
+    "clause": "Small-dollar / installment loan complaint handling (TILA)",
+    "escalation_threshold_days": 3
+  },
+  {
+    "category": "Prepaid card",
+    "ack_days": 2,
+    "resolution_days": 10,
+    "clause": "Reg E prepaid-account error-resolution procedures",
+    "escalation_threshold_days": 3
+  },
+  {
+    "category": "Student loan",
+    "ack_days": 5,
+    "resolution_days": 30,
+    "clause": "Student-loan servicing complaint handling policy",
+    "escalation_threshold_days": 5
+  },
+  {
+    "category": "Vehicle loan or lease",
+    "ack_days": 3,
+    "resolution_days": 15,
+    "clause": "Vehicle finance / lease complaint handling policy",
+    "escalation_threshold_days": 3
+  }
+]

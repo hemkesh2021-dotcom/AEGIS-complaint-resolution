@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Lodge a Complaint · AEGIS</title>
+<style>
+  :root{--bg:#0C0A08;--bg2:#0A0806;--surface:rgba(255,250,240,.05);--border:rgba(240,207,142,.14);
+    --border-strong:rgba(240,207,142,.28);--text:#F2EDE4;--muted:#9A917F;--faint:#6E665A;
+    --gold:#DDB35A;--gold-2:#B8862F;--gold-hi:#F0CF8E;--on-gold:#2A1C04;--ok:#5BBF92;--info:#7EC5DE}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;line-height:1.55}
+  body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:radial-gradient(600px 400px at 15% -10%,rgba(221,179,90,.22),transparent 60%),
+    radial-gradient(600px 500px at 110% 110%,rgba(184,134,47,.18),transparent 60%)}
+  .wrap{position:relative;z-index:1;max-width:660px;margin:0 auto;padding:48px 22px 80px}
+  .brand{display:flex;align-items:center;gap:11px;font-size:20px;font-weight:700;margin-bottom:6px}
+  .brand .mark{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--gold-hi),var(--gold-2));box-shadow:0 4px 16px rgba(221,179,90,.35)}
+  .sub{color:var(--muted);margin:0 0 30px;font-size:14.5px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px;margin-bottom:18px;
+    backdrop-filter:blur(10px);box-shadow:0 10px 40px rgba(8,5,2,.5)}
+  h2{font-size:15px;margin:0 0 4px;font-weight:650}
+  h2 b{background:linear-gradient(135deg,var(--gold-hi),var(--gold-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hint{color:var(--muted);font-size:13px;margin:0 0 16px}
+  label{display:block;font-size:12.5px;color:var(--muted);margin:14px 0 6px}
+  input,textarea{width:100%;background:var(--bg2);color:var(--text);border:1px solid var(--border);
+    border-radius:11px;padding:12px 13px;font-size:14px;font-family:inherit;transition:.16s}
+  input:focus,textarea:focus{outline:none;border-color:var(--border-strong);box-shadow:0 0 0 3px rgba(221,179,90,.12)}
+  textarea{min-height:130px;resize:vertical}
+  .two{display:flex;gap:12px}.two>div{flex:1}
+  .btn{margin-top:18px;width:100%;padding:13px;border:none;border-radius:12px;cursor:pointer;font-size:15px;font-weight:650;
+    background:linear-gradient(135deg,var(--gold-hi),var(--gold-2));color:var(--on-gold);display:flex;align-items:center;justify-content:center;gap:8px}
+  .btn:hover{filter:brightness(1.06)}.btn:disabled{opacity:.6}
+  .btn.ghost{background:var(--surface);color:var(--text);border:1px solid var(--border);font-weight:500;font-size:13.5px}
+  .ack{border:1px solid rgba(91,191,146,.4);background:rgba(91,191,146,.08);border-radius:14px;padding:20px}
+  .ack .tick{width:40px;height:40px;border-radius:50%;background:rgba(91,191,146,.16);display:grid;place-items:center;margin-bottom:12px}
+  .ref{font-size:20px;font-weight:700;color:var(--gold-hi);letter-spacing:.02em}
+  .kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13.5px}
+  .kv:last-child{border:none}.kv .k{color:var(--muted)}
+  .pill{display:inline-block;font-size:12px;padding:4px 11px;border-radius:20px;border:1px solid var(--border);color:var(--muted)}
+  .pill.rev{color:var(--gold-hi);border-color:var(--border-strong)}
+  .pill.done{color:var(--ok);border-color:rgba(91,191,146,.45);background:rgba(91,191,146,.08)}
+  .email{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-top:4px}
+  .email .subj{font-weight:600;font-size:14.5px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+  .email .body{white-space:pre-wrap;font-size:13.5px;color:#E7E0D3;max-height:360px;overflow:auto;line-height:1.6}
+  .summary{border:1px solid var(--border-strong);background:rgba(221,179,90,.08);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+  .summary .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--gold-hi);font-weight:700;margin-bottom:6px}
+  .cfg{font-size:11.5px;color:var(--faint);margin-top:8px}.cfg input{width:auto;padding:4px 8px;font-size:11.5px}
+  .row{display:flex;gap:10px;align-items:end}.row>div{flex:1}
+  .spin{width:15px;height:15px;border:2px solid rgba(42,28,4,.35);border-top-color:var(--on-gold);border-radius:50%;animation:sp .7s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .fade{animation:fade .45s ease both}@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .live{font-size:11.5px;color:var(--faint);margin-top:12px;display:flex;align-items:center;gap:7px}
+  .livedot{width:7px;height:7px;border-radius:50%;background:var(--gold);animation:blink 1.4s infinite}
+  @keyframes blink{50%{opacity:.3}}
+  .note{font-size:12px;color:var(--faint);margin-top:14px;text-align:center}.note a{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><span class="mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2A1C04" stroke-width="2.2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/></svg></span>AEGIS</div>
+  <p class="sub">Customer complaint portal — lodge a complaint and track its progress.</p>
+
+  <div class="card">
+    <h2>Lodge a <b>complaint</b></h2>
+    <p class="hint">Tell us what happened. You'll get a reference number and a date by which we'll respond.</p>
+    <div class="two">
+      <div><label>Your name</label><input id="name" value="A. Rao"/></div>
+      <div><label>Email (optional)</label><input id="email" placeholder="you@example.com"/></div>
+    </div>
+    <label>What happened?</label>
+    <textarea id="text" placeholder="Describe your complaint in your own words…">I noticed three charges on my credit card last week that I never authorized — $420 total to a merchant I have never heard of. I reported my card as compromised but nothing has been reversed.</textarea>
+    <button class="btn" id="send" onclick="lodge()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12H7l-3 3z"/></svg>Submit complaint</button>
+    <div class="cfg">Service endpoint <input id="apiBase" value="http://localhost:8080"/></div>
+  </div>
+
+  <div id="ackWrap"></div>
+
+  <div class="card">
+    <h2>Track a complaint</h2>
+    <p class="hint">Already have a reference number? Check its status and read our response.</p>
+    <div class="row">
+      <div><label>Reference number</label><input id="trackId" placeholder="CMP-…"/></div>
+      <div style="flex:none"><button class="btn ghost" style="margin:0" onclick="track()">Check status</button></div>
+    </div>
+    <div id="trackWrap"></div>
+  </div>
+
+  <p class="note">Staff view: <a href="index.html">operator console →</a></p>
+</div>
+
+<script>
+const $=s=>document.querySelector(s), api=()=>$("#apiBase").value.replace(/\/$/,"");
+let pollTimer=null, pollId=null;
+function esc(s){return (s==null?"":String(s)).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}
+function fmt(iso){if(!iso)return"—";const d=new Date(iso);if(isNaN(d))return esc(iso);
+  return d.toLocaleString("en-US",{month:"long",day:"numeric",year:"numeric",hour:"2-digit",minute:"2-digit"})}
+function statusPill(s,label){return s==="SENT"?`<span class="pill done">✓ ${esc(label||"Responded")}</span>`:`<span class="pill rev">${esc(label||"Under review")}</span>`}
+
+// The response the customer receives — summary + the full reply "email".
+function replyHTML(reply){
+  if(!reply||!reply.body)return"";
+  return `<div class="card fade" style="border-color:rgba(91,191,146,.4)">
+    <h2 style="color:var(--ok)">✓ We've responded to your complaint</h2>
+    <p class="hint">A specialist has reviewed and answered your complaint. Here's a quick summary, followed by the full message.</p>
+    ${reply.summary?`<div class="summary"><div class="lbl">Summary</div>${esc(reply.summary)}</div>`:""}
+    <div class="email"><div class="subj">${esc(reply.subject)||"Response to your complaint"}</div><div class="body">${esc(reply.body)}</div></div></div>`;
+}
+
+async function lodge(){
+  const b=$("#send"),t=$("#text").value.trim();if(!t){$("#text").focus();return;}
+  b.disabled=true;b.innerHTML='<span class="spin"></span> Submitting…';$("#ackWrap").innerHTML="";clearInterval(pollTimer);
+  try{
+    const r=await fetch(api()+"/api/intake",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({text:t,customerName:$("#name").value,channel:"WEB"})});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const d=await r.json();
+    $("#ackWrap").innerHTML=`<div class="card fade"><div class="ack">
+      <div class="tick"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5BBF92" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <div style="font-size:13px;color:var(--muted)">Complaint received — your reference is</div>
+      <div class="ref">${esc(d.complaintId)}</div>
+      <p style="font-size:13.5px;margin:12px 0 14px">${esc(d.message)}</p>
+      <div class="kv"><span class="k">Status</span><span id="liveStatus">${statusPill(d.status,d.statusLabel)}</span></div>
+      <div class="kv"><span class="k">Acknowledged by</span><span>${fmt(d.ackDue)}</span></div>
+      <div class="kv"><span class="k">We'll respond by</span><span><b>${fmt(d.resolutionDue)}</b></span></div>
+      <div class="live"><span class="livedot"></span> This page updates automatically when a specialist responds. <a onclick="pollOnce(pollId)" style="color:var(--gold-hi);cursor:pointer;margin-left:2px">Check now</a></div>
+    </div></div><div id="respWrap"></div>`;
+    $("#trackId").value=d.complaintId;
+    startPoll(d.complaintId);
+  }catch(e){$("#ackWrap").innerHTML=`<div class="card"><div class="hint">Sorry, we couldn't submit that (${esc(e.message)}). Please try again shortly.</div></div>`}
+  finally{b.disabled=false;b.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12H7l-3 3z"/></svg>Submit complaint';}
+}
+
+// Poll the status until a specialist has responded. Also re-checks immediately
+// when the customer returns to this tab — browsers throttle/pause timers in
+// background tabs, so switching away wouldn't otherwise update live.
+async function pollOnce(id){
+  if(!id)return;
+  try{
+    const d=await (await fetch(api()+"/api/status/"+encodeURIComponent(id))).json();
+    const ls=$("#liveStatus");if(ls)ls.innerHTML=statusPill(d.status,d.statusLabel);
+    if(d.reply){const rw=$("#respWrap");if(rw)rw.innerHTML=replyHTML(d.reply);
+      const live=document.querySelector(".live");if(live)live.remove();
+      pollId=null;stopPoll();}
+  }catch(e){}
+}
+function stopPoll(){if(pollTimer){clearInterval(pollTimer);pollTimer=null;}}
+function startPoll(id){
+  stopPoll();pollId=id;let tries=0;
+  pollTimer=setInterval(()=>{tries++;pollOnce(id);if(tries>120)stopPoll();},4000);
+}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")pollOnce(pollId);});
+window.addEventListener("focus",()=>pollOnce(pollId));
+
+async function track(){
+  const id=$("#trackId").value.trim();if(!id)return;
+  const w=$("#trackWrap");w.innerHTML='<p class="hint" style="margin-top:14px">Checking…</p>';
+  try{
+    const r=await fetch(api()+"/api/status/"+encodeURIComponent(id));
+    if(r.status===404){w.innerHTML='<p class="hint" style="margin-top:14px">No complaint found with that reference.</p>';return;}
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const d=await r.json();
+    w.innerHTML=`<div class="ack fade" style="margin-top:16px;border-color:var(--border);background:var(--bg2)">
+      <div class="ref" style="font-size:16px">${esc(d.complaintId)}</div>
+      <div class="kv" style="margin-top:8px"><span class="k">Status</span><span>${statusPill(d.status,d.statusLabel)}</span></div>
+      <div class="kv"><span class="k">Category</span><span>${esc(d.category)||"—"}</span></div>
+      <div class="kv"><span class="k">We'll respond by</span><span><b>${fmt(d.resolutionDue)}</b></span></div></div>
+      ${replyHTML(d.reply)}`;
+  }catch(e){w.innerHTML=`<p class="hint" style="margin-top:14px">Couldn't check status (${esc(e.message)}).</p>`}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+server:
+  port: 8080
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+  max-http-request-header-size: 16KB
+
+aegis:
+  api-key: ${AEGIS_API_KEY:}
+  allowed-origins: ${AEGIS_ALLOWED_ORIGINS:http://localhost:8088}
+  intake-rate-per-minute: ${AEGIS_INTAKE_RATE:20}
+
+spring:
+  application:
+    name: aegis-api
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/aegis}
+    username: ${SPRING_DATASOURCE_USERNAME:aegis}
+    password: ${SPRING_DATASOURCE_PASSWORD:aegis}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  ai:
+    model:
+      chat: openai          # NIM (OpenAI-compatible) for drafting
+      embedding: transformers   # local ONNX embeddings (no API key)
+    openai:
+      base-url: ${NIM_BASE_URL:https://integrate.api.nvidia.com}
+      api-key: ${NIM_API_KEY:nvapi-not-set}
+      chat:
+        options:
+          model: ${NIM_CHAT_MODEL:openai/gpt-oss-120b}
+          temperature: 0.7
+    embedding:
+      transformer:
+        tokenizer:
+          options:
+            padding: true
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 384
+
+# URL of the Python classifier service. Empty = use the built-in keyword
+# fallback (so the API runs before the model service is up).
+classifier:
+  url: ${CLASSIFIER_URL:http://localhost:8000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+        liveness:
+          include: livenessState
+
+---
+# prod profile: emit ECS-format structured JSON logs (SPRING_PROFILES_ACTIVE=prod)
+spring:
+  config:
+    activate:
+      on-profile: prod
+logging:
+  structured:
+    format:
+      console: ecs
