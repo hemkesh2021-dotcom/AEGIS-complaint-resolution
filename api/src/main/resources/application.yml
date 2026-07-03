@@ -13,6 +13,13 @@ aegis:
   status-rate-per-minute: ${AEGIS_STATUS_RATE:60}
   # PII retention: days to keep cases + audit events. 0 = keep forever (dev only).
   retention-days: ${AEGIS_RETENTION_DAYS:0}
+  # Only honor X-Forwarded-For when the API sits behind a proxy you control.
+  trust-proxy: ${AEGIS_TRUST_PROXY:false}
+  mail:
+    enabled: ${AEGIS_MAIL_ENABLED:false}
+    from: ${AEGIS_MAIL_FROM:AEGIS Customer Care <care@aegis.local>}
+  # Base URL used in customer emails for the tracking link.
+  public-base-url: ${AEGIS_PUBLIC_BASE_URL:http://localhost:8088}
 
 spring:
   application:

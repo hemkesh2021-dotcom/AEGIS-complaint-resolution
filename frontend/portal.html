@@ -117,7 +117,7 @@
 
 <script>
 const $=s=>document.querySelector(s), api=()=>$("#apiBase").value.replace(/\/$/,"");
-let pollTimer=null, pollId=null;
+let pollTimer=null, pollId=null, es=null;
 function esc(s){return (s==null?"":String(s)).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}
 function fmt(iso){if(!iso)return"—";const d=new Date(iso);if(isNaN(d))return esc(iso);
   return d.toLocaleString("en-US",{month:"long",day:"numeric",year:"numeric",hour:"2-digit",minute:"2-digit"})}
@@ -138,10 +138,10 @@ function replyHTML(reply,followUps){
 
 async function lodge(){
   const b=$("#send"),t=$("#text").value.trim();if(!t){$("#text").focus();return;}
-  b.disabled=true;b.innerHTML='<span class="spin"></span> Submitting…';$("#ackWrap").innerHTML="";clearInterval(pollTimer);
+  b.disabled=true;b.innerHTML='<span class="spin"></span> Submitting…';$("#ackWrap").innerHTML="";stopLive();
   try{
     const r=await fetch(api()+"/api/intake",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({text:t,customerName:$("#name").value,channel:"WEB"})});
+      body:JSON.stringify({text:t,customerName:$("#name").value,email:($("#email").value.trim()||undefined),channel:"WEB"})});
     if(!r.ok)throw new Error("HTTP "+r.status);
     const d=await r.json();
     $("#ackWrap").innerHTML=`<div class="card fade"><div class="ack">
@@ -156,28 +156,42 @@ async function lodge(){
       <div class="live"><span class="livedot"></span> This page updates automatically when a specialist responds. <a onclick="pollOnce(pollId)" style="color:var(--gold-hi);cursor:pointer;margin-left:2px">Check now</a></div>
     </div></div><div id="respWrap"></div>`;
     $("#trackId").value=d.trackingToken;
-    startPoll(d.trackingToken);
+    startLive(d.trackingToken);
   }catch(e){$("#ackWrap").innerHTML=`<div class="card"><div class="hint">Sorry, we couldn't submit that (${esc(e.message)}). Please try again shortly.</div></div>`}
   finally{b.disabled=false;b.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12H7l-3 3z"/></svg>Submit complaint';}
 }
 
-// Poll the status until a specialist has responded. Also re-checks immediately
-// when the customer returns to this tab — browsers throttle/pause timers in
-// background tabs, so switching away wouldn't otherwise update live.
+// Live updates: Server-Sent Events push the response the instant an operator
+// approves it (and any follow-ups after). Falls back to 4s polling only if
+// the browser or network can't hold an SSE connection.
 async function pollOnce(id){
   if(!id)return;
   try{
     const d=await (await fetch(api()+"/api/status/"+encodeURIComponent(id))).json();
     const ls=$("#liveStatus");if(ls)ls.innerHTML=statusPill(d.status,d.statusLabel);
     if(d.reply){const rw=$("#respWrap");if(rw)rw.innerHTML=replyHTML(d.reply,d.followUps);
-      const live=document.querySelector(".live");if(live)live.remove();
-      pollId=null;stopPoll();}
+      const live=document.querySelector(".live");
+      if(live)live.innerHTML='<span class="livedot" style="background:var(--ok)"></span> Live — any further updates from our team appear here instantly.';}
   }catch(e){}
 }
 function stopPoll(){if(pollTimer){clearInterval(pollTimer);pollTimer=null;}}
+function stopLive(){if(es){es.close();es=null;}stopPoll();pollId=null;}
 function startPoll(id){
-  stopPoll();pollId=id;let tries=0;
-  pollTimer=setInterval(()=>{tries++;pollOnce(id);if(tries>120)stopPoll();},4000);
+  stopPoll();let tries=0;
+  pollTimer=setInterval(()=>{tries++;pollOnce(id);if(tries>200)stopPoll();},4000);
+}
+function startLive(id){
+  stopLive();pollId=id;
+  if(window.EventSource){
+    try{
+      es=new EventSource(api()+"/api/status/"+encodeURIComponent(id)+"/stream");
+      es.addEventListener("update",()=>pollOnce(id));
+      es.onerror=()=>{if(es&&es.readyState===EventSource.CLOSED){es=null;startPoll(id);}};
+      pollOnce(id); // catch anything that happened before the stream opened
+      return;
+    }catch(e){}
+  }
+  startPoll(id);
 }
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")pollOnce(pollId);});
 window.addEventListener("focus",()=>pollOnce(pollId));

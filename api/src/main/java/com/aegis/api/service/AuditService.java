@@ -40,11 +40,12 @@ public class AuditService {
 
     @Transactional
     public void record(ComplaintResponse r, String complaintText, String customerName,
-                       List<String> draftWarnings) {
+                       String customerEmail, List<String> draftWarnings) {
         CaseRecord c = new CaseRecord();
         c.setComplaintId(r.complaintId());
         c.setTrackingToken(newTrackingToken());
         c.setCustomerName(customerName);
+        c.setCustomerEmail(customerEmail == null || customerEmail.isBlank() ? null : customerEmail.trim());
         c.setComplaintText(complaintText);
         c.setDraftWarnings(draftWarnings == null || draftWarnings.isEmpty()
                 ? null : String.join("\n", draftWarnings));

@@ -45,6 +45,7 @@ docker compose up --build
 | Customer portal | http://localhost:8088/portal.html |
 | Operator console | http://localhost:8088 (enter your `AEGIS_API_KEY` in the sidebar) |
 | 3D architecture | http://localhost:8088/architecture.html |
+| Email inbox (MailHog) | http://localhost:8025 — every customer email lands here locally |
 | API health | http://localhost:8080/health |
 
 Without a NIM key the pipeline still runs end to end — drafts come from the deterministic template engine (`"source": "Template engine"` instead of `"NVIDIA NIM (RAG)"`). On first startup the API ingests `knowledge/kb.json` into pgvector using local ONNX embeddings (no key needed).
@@ -55,8 +56,9 @@ Without a NIM key the pipeline still runs end to end — drafts come from the de
 
 **Public** (rate-limited per IP):
 
-- `POST /api/intake` — lodge a complaint → acknowledgement + `trackingToken`
+- `POST /api/intake` — lodge a complaint → acknowledgement + `trackingToken` (+ acknowledgement email if an address was given)
 - `GET /api/status/{trackingToken}` — status; once responded: reply + summary + follow-up thread
+- `GET /api/status/{trackingToken}/stream` — **SSE live stream**: the page learns about responses and follow-ups the instant an operator sends them (portal falls back to polling automatically)
 
 **Operator** (require `X-API-Key`):
 
@@ -112,7 +114,7 @@ Defense in depth, documented in full in [SECURITY.md](SECURITY.md):
 - **Auth:** operator endpoints + `/actuator/metrics` behind `X-API-Key` (constant-time compare); only intake, status, and health are public.
 - **AI-output safety:** the grounding gate blocks invented figures, contacts, and template debris at draft *and* send time; overrides are audited.
 - **Data protection:** PII redaction + name tokenization before any external LLM call; 128-bit tracking tokens; retention purge job.
-- **Abuse resistance:** per-IP rate limits on intake (LLM-cost abuse) and status (token guessing); 8 KB input cap; suppressed stack traces; non-root containers.
+- **Abuse resistance:** per-IP rate limits on intake (LLM-cost abuse) and status (token guessing), **Redis-backed** so they hold across replicas (in-memory fallback, never fails open); `X-Forwarded-For` honored only behind a trusted proxy (`AEGIS_TRUST_PROXY`); 8 KB input cap; suppressed stack traces; non-root containers.
 - **Supply chain:** gitleaks secret-scanning in CI (full history); Dependabot across Maven, pip, Actions, and Dockerfiles.
 
 **For production:** replace the shared key with OAuth2/OIDC + roles, terminate TLS behind a WAF, and move secrets to a secret manager.
@@ -131,7 +133,7 @@ Deploys the classifier (private) and the API (public, wired to the classifier UR
 
 ## Roadmap
 
-Server-sent events for live portal updates (replacing polling) · OAuth2/OIDC with operator roles + maker-checker approval · distributed rate limiting · real email delivery (in + out) · operator-feedback learning loop (edits → retraining data) · hybrid retrieval (BM25 + reranker) with citation-pinned drafts · multilingual intake · case-intelligence dashboard · k6 load-test benchmarks.
+OAuth2/OIDC with operator roles + maker-checker approval · inbound email intake · operator-feedback learning loop (edits → retraining data) · hybrid retrieval (BM25 + reranker) with citation-pinned drafts · multilingual intake · case-intelligence dashboard · k6 load-test benchmarks.
 
 ## Contributing
 

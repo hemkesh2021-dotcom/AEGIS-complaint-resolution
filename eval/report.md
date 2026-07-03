@@ -1,6 +1,8 @@
-# AEGIS Evaluation Report
+# AEGIS — Behavioral Regression Suite
 
-Cases: **18** · API: `http://localhost:8080`
+Cases: **18** curated, deliberately clear-cut · API: `http://localhost:8080`
+
+> A sanity/regression check on the whole pipeline — high scores mean *nothing broke*, not that the model is this accurate on real data. For honest model metrics see `cfpb_report.md` (run with `--cfpb`).
 
 | Metric | Value |
 |---|---|

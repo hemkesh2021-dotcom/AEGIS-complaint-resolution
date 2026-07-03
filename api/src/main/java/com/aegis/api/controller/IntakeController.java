@@ -5,6 +5,8 @@ import com.aegis.api.dto.ComplaintResponse;
 import com.aegis.api.entity.CaseMessage;
 import com.aegis.api.repo.CaseMessageRepository;
 import com.aegis.api.repo.CaseRepository;
+import com.aegis.api.service.CaseEventsPublisher;
+import com.aegis.api.service.EmailService;
 import com.aegis.api.service.PipelineService;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * Customer-facing web intake + status tracking. Runs the full pipeline (so the
@@ -33,12 +36,17 @@ public class IntakeController {
     private final PipelineService pipeline;
     private final CaseRepository cases;
     private final CaseMessageRepository messages;
+    private final EmailService email;
+    private final CaseEventsPublisher events;
 
     public IntakeController(PipelineService pipeline, CaseRepository cases,
-                            CaseMessageRepository messages) {
+                            CaseMessageRepository messages, EmailService email,
+                            CaseEventsPublisher events) {
         this.pipeline = pipeline;
         this.cases = cases;
         this.messages = messages;
+        this.email = email;
+        this.events = events;
     }
 
     public record AckResponse(String complaintId, String trackingToken, String status,
@@ -51,7 +59,10 @@ public class IntakeController {
         ComplaintResponse r = pipeline.run(request, "WEB");
         // The tracking token — not the guessable reference — is the customer's status key.
         String token = cases.findById(r.complaintId())
-                .map(c -> c.getTrackingToken()).orElse("");
+                .map(c -> {
+                    email.sendAcknowledgement(c);   // best-effort; audited; never breaks intake
+                    return c.getTrackingToken();
+                }).orElse("");
         return new AckResponse(
                 r.complaintId(), token, r.status(), label(r.status()),
                 r.compliance().ackDue(), r.compliance().resolutionDue(),
@@ -96,6 +107,18 @@ public class IntakeController {
             }
             return ResponseEntity.ok(m);
         }).orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Live status stream (SSE) — the page hears about a response the instant an
+     * operator sends it, no polling. Public like GET /status, keyed by the same
+     * unguessable tracking token, and covered by the same per-IP rate limit.
+     */
+    @GetMapping("/status/{token}/stream")
+    public ResponseEntity<SseEmitter> stream(@PathVariable String token) {
+        return cases.findByTrackingToken(token)
+                .map(c -> ResponseEntity.ok(events.subscribe(token)))
+                .orElse(ResponseEntity.notFound().build());
     }
 
     private static String nz(String s) {

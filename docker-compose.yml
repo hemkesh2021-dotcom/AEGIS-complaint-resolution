@@ -32,6 +32,16 @@ services:
     ports:
       - "8000:8000"
 
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+
+  # Local mail catcher — every customer email lands in the inbox at http://localhost:8025
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "8025:8025"
+
   api:
     build: ./api
     environment:
@@ -44,6 +54,13 @@ services:
       NIM_CHAT_MODEL: ${NIM_CHAT_MODEL:-openai/gpt-oss-120b}
       AEGIS_API_KEY: ${AEGIS_API_KEY:-aegis-dev-key-change-me}
       AEGIS_ALLOWED_ORIGINS: ${AEGIS_ALLOWED_ORIGINS:-http://localhost:8088}
+      # Distributed rate limiting (falls back to in-memory if Redis is down)
+      SPRING_DATA_REDIS_HOST: redis
+      # Email via the local MailHog catcher (swap for real SMTP in production)
+      SPRING_MAIL_HOST: mailhog
+      SPRING_MAIL_PORT: 1025
+      AEGIS_MAIL_ENABLED: ${AEGIS_MAIL_ENABLED:-true}
+      AEGIS_PUBLIC_BASE_URL: ${AEGIS_PUBLIC_BASE_URL:-http://localhost:8088}
     ports:
       - "8080:8080"
     depends_on:
@@ -51,6 +68,10 @@ services:
         condition: service_started
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
+      mailhog:
+        condition: service_started
 
   web:
     image: nginx:alpine

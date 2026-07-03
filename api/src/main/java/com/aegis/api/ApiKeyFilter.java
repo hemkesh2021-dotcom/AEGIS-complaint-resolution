@@ -1,5 +1,6 @@
 package com.aegis.api;
 
+import com.aegis.api.service.RateLimiter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -7,7 +8,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,14 +38,19 @@ public class ApiKeyFilter extends OncePerRequestFilter {
     private final String apiKey;
     private final int intakePerMinute;
     private final int statusPerMinute;
-    private final ConcurrentHashMap<String, long[]> buckets = new ConcurrentHashMap<>();
+    private final boolean trustProxy;
+    private final RateLimiter rateLimiter;
 
     public ApiKeyFilter(@Value("${aegis.api-key:}") String apiKey,
                         @Value("${aegis.intake-rate-per-minute:20}") int intakePerMinute,
-                        @Value("${aegis.status-rate-per-minute:60}") int statusPerMinute) {
+                        @Value("${aegis.status-rate-per-minute:60}") int statusPerMinute,
+                        @Value("${aegis.trust-proxy:false}") boolean trustProxy,
+                        RateLimiter rateLimiter) {
         this.apiKey = apiKey == null ? "" : apiKey.trim();
         this.intakePerMinute = intakePerMinute;
         this.statusPerMinute = statusPerMinute;
+        this.trustProxy = trustProxy;
+        this.rateLimiter = rateLimiter;
     }
 
     @Override
@@ -68,11 +73,13 @@ public class ApiKeyFilter extends OncePerRequestFilter {
         if (publicPath) {
             // Both public endpoints are rate-limited: intake (LLM-cost abuse) and
             // status (tracking-token guessing / enumeration).
-            if (path.equals("/api/intake") && !allow("in:" + clientIp(req), intakePerMinute)) {
+            if (path.equals("/api/intake")
+                    && !rateLimiter.allow("in:" + clientIp(req), intakePerMinute)) {
                 deny(res, 429, "{\"error\":\"rate limit exceeded\"}");
                 return;
             }
-            if (path.startsWith("/api/status/") && !allow("st:" + clientIp(req), statusPerMinute)) {
+            if (path.startsWith("/api/status/")
+                    && !rateLimiter.allow("st:" + clientIp(req), statusPerMinute)) {
                 deny(res, 429, "{\"error\":\"rate limit exceeded\"}");
                 return;
             }
@@ -94,19 +101,6 @@ public class ApiKeyFilter extends OncePerRequestFilter {
         chain.doFilter(req, res);
     }
 
-    private boolean allow(String bucketKey, int perMinute) {
-        long now = System.currentTimeMillis();
-        long[] b = buckets.computeIfAbsent(bucketKey, k -> new long[]{now, 0});
-        synchronized (b) {
-            if (now - b[0] > 60_000L) {
-                b[0] = now;
-                b[1] = 0;
-            }
-            b[1]++;
-            return b[1] <= perMinute;
-        }
-    }
-
     private static void deny(HttpServletResponse res, int status, String body) throws IOException {
         res.setStatus(status);
         res.setHeader("Access-Control-Allow-Origin", "*"); // error bodies carry no data
@@ -114,10 +108,17 @@ public class ApiKeyFilter extends OncePerRequestFilter {
         res.getWriter().write(body);
     }
 
-    private static String clientIp(HttpServletRequest req) {
-        String xff = req.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isBlank()) {
-            return xff.split(",")[0].trim();
+    /**
+     * X-Forwarded-For is attacker-controlled unless a proxy we operate sets it —
+     * honoring it blindly lets clients spoof fresh IPs and dodge the rate limit.
+     * Only trusted when {@code aegis.trust-proxy=true} (i.e., behind our LB).
+     */
+    private String clientIp(HttpServletRequest req) {
+        if (trustProxy) {
+            String xff = req.getHeader("X-Forwarded-For");
+            if (xff != null && !xff.isBlank()) {
+                return xff.split(",")[0].trim();
+            }
         }
         return req.getRemoteAddr();
     }

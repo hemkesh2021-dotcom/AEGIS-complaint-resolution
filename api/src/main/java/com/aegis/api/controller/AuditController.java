@@ -7,8 +7,10 @@ import com.aegis.api.entity.CaseRecord;
 import com.aegis.api.repo.AuditEventRepository;
 import com.aegis.api.repo.CaseMessageRepository;
 import com.aegis.api.repo.CaseRepository;
+import com.aegis.api.service.CaseEventsPublisher;
 import com.aegis.api.service.DraftService;
 import com.aegis.api.service.DraftVerifier;
+import com.aegis.api.service.EmailService;
 import com.aegis.api.service.RagRetriever;
 import java.util.List;
 import java.util.Map;
@@ -37,16 +39,21 @@ public class AuditController {
     private final DraftService drafting;
     private final DraftVerifier verifier;
     private final RagRetriever retriever;
+    private final EmailService email;
+    private final CaseEventsPublisher caseEvents;
 
     public AuditController(CaseRepository cases, AuditEventRepository events,
                            CaseMessageRepository messages, DraftService drafting,
-                           DraftVerifier verifier, RagRetriever retriever) {
+                           DraftVerifier verifier, RagRetriever retriever,
+                           EmailService email, CaseEventsPublisher caseEvents) {
         this.cases = cases;
         this.events = events;
         this.messages = messages;
         this.drafting = drafting;
         this.verifier = verifier;
         this.retriever = retriever;
+        this.email = email;
+        this.caseEvents = caseEvents;
     }
 
     /** One case + its ordered audit trail + follow-up thread. */
@@ -117,6 +124,8 @@ public class AuditController {
             events.save(new AuditEvent(id, "approved", issues.isEmpty()
                     ? "CS reviewed, approved, and sent the reply"
                     : "CS sent with OVERRIDE despite grounding issues: " + String.join(" | ", issues)));
+            email.sendResponse(c);                            // real delivery, audited
+            caseEvents.publish(c.getTrackingToken(), "update"); // push to any open portal page
             return ResponseEntity.ok((Object) c);
         }).orElse(ResponseEntity.notFound().build());
     }
@@ -160,6 +169,8 @@ public class AuditController {
             events.save(new AuditEvent(id, "follow-up", issues.isEmpty()
                     ? "operator sent a follow-up: " + subject
                     : "follow-up sent with OVERRIDE despite grounding issues: " + String.join(" | ", issues)));
+            email.sendFollowUp(c, subject, req.body());
+            caseEvents.publish(c.getTrackingToken(), "update");
             return ResponseEntity.ok((Object) m);
         }).orElse(ResponseEntity.notFound().build());
     }

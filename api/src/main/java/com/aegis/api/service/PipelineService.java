@@ -84,7 +84,7 @@ public class PipelineService {
                 id, prediction, comp, draft, tasks, esc, urgency, "IN_REVIEW", channel);
 
         // Phase 7 — audit
-        audit.record(response, req.text(), customer, draftWarnings);
+        audit.record(response, req.text(), customer, req.email(), draftWarnings);
         return response;
     }
 

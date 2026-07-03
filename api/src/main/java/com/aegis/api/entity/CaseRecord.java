@@ -20,6 +20,9 @@ public class CaseRecord {
 
     private String customerName;
 
+    /** For notifications only — never sent to the external LLM; purged by retention. */
+    private String customerEmail;
+
     @Column(columnDefinition = "text")
     private String complaintText;
 
@@ -75,6 +78,9 @@ public class CaseRecord {
 
     public String getCustomerName() { return customerName; }
     public void setCustomerName(String v) { this.customerName = v; }
+
+    public String getCustomerEmail() { return customerEmail; }
+    public void setCustomerEmail(String v) { this.customerEmail = v; }
 
     public String getDraftWarnings() { return draftWarnings; }
     public void setDraftWarnings(String v) { this.draftWarnings = v; }
