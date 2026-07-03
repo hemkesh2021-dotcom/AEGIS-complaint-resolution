@@ -17,6 +17,13 @@
     <name>aegis-api</name>
     <description>AEGIS v2 orchestrator — agentic complaint resolution</description>
 
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://opensource.org/licenses/MIT</url>
+        </license>
+    </licenses>
+
     <properties>
         <java.version>21</java.version>
         <spring-ai.version>1.0.9</spring-ai.version>

@@ -1,5 +1,8 @@
 # AEGIS v2 — Polyglot RAG Complaint Pipeline
 
+![CI](https://github.com/hemkesh2021-dotcom/AEGIS-complaint-resolution/actions/workflows/ci.yml/badge.svg)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A production-shaped rebuild of AEGIS: a **Spring Boot** orchestrator (Java 21) that calls a **Python** DistilBERT classifier service, applies explainable compliance rules, drafts a reply, decides escalation, and audits every case. Deployable on GCP Cloud Run.
 
 > This is the Weeks 1–3 foundation from `../AEGIS_v2_Roadmap.md`. RAG retrieval + LLM drafting (Weeks 4–5), the Postgres audit store (Week 3), and CI/CD (Week 7) are marked with `TODO`s and ready to slot in. See `../AEGIS_v2_Architecture.md` and `../AEGIS_v2_Prototype_Walkthrough.md` for the full design.
@@ -121,6 +124,16 @@ Set `AEGIS_API_KEY` and `AEGIS_ALLOWED_ORIGINS` in `.env`; the operator console 
 PROJECT=your-project REGION=asia-south1 ./infra/deploy.sh
 ```
 Deploys the classifier (private) and the API (public, wired to the classifier URL). Move the NIM key + DB creds to Secret Manager before wiring the LLM (Week 7).
+
+## Contributing
+
+Contributions are welcome — please read [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). Report vulnerabilities privately via [SECURITY.md](SECURITY.md).
+
+## License
+
+Released under the [MIT License](LICENSE) © 2026 Hemkesh.
+
+> **Disclaimer:** an educational / portfolio project — not legal or financial advice. The bundled regulation knowledge base is illustrative only. Do not process real customer PII without appropriate privacy and security controls.
 
 ## Next (from the roadmap)
 
