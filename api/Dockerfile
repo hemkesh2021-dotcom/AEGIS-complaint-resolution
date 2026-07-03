@@ -7,7 +7,7 @@ COPY src ./src
 RUN mvn -q -e -B clean package -DskipTests
 
 # ---- runtime stage ----
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:25-jre
 WORKDIR /app
 COPY --from=build /app/target/aegis-api-*.jar app.jar
 # Run as an unprivileged user with a writable home (DJL/ONNX model cache lives in $HOME)
