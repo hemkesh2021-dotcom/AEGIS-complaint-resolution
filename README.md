@@ -17,6 +17,7 @@ A **Spring Boot** (Java 21) orchestrator chains seven phases — ingest → clas
 - **Immutable communications.** Sent replies can't be edited — corrections go out as follow-up messages the customer sees as a thread, each one re-verified and audited.
 - **Hybrid, citation-pinned retrieval.** Semantic search (pgvector) fused with keyword BM25 via reciprocal-rank fusion — embeddings catch paraphrase, BM25 catches exact regulatory vocabulary. Every case stores the exact passages that grounded its draft, and the operator sees them as "Grounding sources" before approving. If pgvector is down, retrieval degrades to keyword-only instead of failing.
 - **A learning loop, closed.** Every approval is implicit feedback: the edit-similarity between AI draft and human-approved final is computed, audited, and exported at `GET /api/training-data` as labeled retraining examples.
+- **Case intelligence built in.** Every complaint is embedded at intake (same local model as RAG); operators see similar past cases with duplicate and repeat-complainant flags, and an **Insights** dashboard tracks trends, SLA breaches approaching, risk-signal mix, and how often the AI's drafts ship unedited.
 - **Honestly evaluated.** Accuracy is measured on a *temporal holdout* refreshed from the live CFPB API — not a curated demo set (see [Evaluation](#evaluation)).
 - **Explainable by default.** Deadlines, risk flags, escalation, and urgency are deterministic rules with recorded reasons — ML only where it earns its place, and low classifier confidence auto-escalates to a human.
 
@@ -69,6 +70,8 @@ Without a NIM key the pipeline still runs end to end — drafts come from the de
 - `POST /api/complaints/{id}/approve` — verify + send; `422` with issues if the grounding check fails (`force: true` to override, audited); `409` once sent
 - `POST /api/complaints/{id}/follow-up` — append a verified correction/update to a sent case
 - `GET /api/training-data` — **learning-loop export**: every approved case as a labeled example (complaint, AI draft, human-approved final, edit-similarity signal) ready for retraining
+- `GET /api/insights` — **product intelligence**: category/urgency/daily trends, SLA watchlist, risk-flag mix, repeat complainants, AI-draft quality
+- `GET /api/complaints/{id}/similar` — similar past cases (cosine over stored local embeddings) with duplicate + same-customer flags
 - `POST /api/eval` — fast, side-effect-free scoring endpoint for the eval harness
 
 ## Evaluation
@@ -138,7 +141,7 @@ Deploys the classifier (private) and the API (public, wired to the classifier UR
 
 ## Roadmap
 
-OAuth2/OIDC with operator roles + maker-checker approval · inbound email intake · cross-encoder reranking on top of hybrid retrieval · periodic retraining job over `/api/training-data` · multilingual intake · case-intelligence dashboard · k6 load-test benchmarks.
+OAuth2/OIDC with operator roles + maker-checker approval · inbound email intake · cross-encoder reranking on top of hybrid retrieval · periodic retraining job over `/api/training-data` · multilingual intake · k6 load-test benchmarks.
 
 ## Contributing
 

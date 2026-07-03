@@ -16,5 +16,9 @@ public interface CaseRepository extends JpaRepository<CaseRecord, String> {
 
     List<CaseRecord> findByStatusOrderByCreatedAtDesc(String status);
 
+    List<CaseRecord> findTop500ByOrderByCreatedAtDesc();
+
+    long countByCustomerEmailIgnoreCase(String customerEmail);
+
     long deleteByCreatedAtBefore(Instant cutoff);
 }

@@ -155,6 +155,7 @@
     <nav>
       <button class="navbtn active" data-tab="queue"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Review queue<span class="cnt hide" id="qCount">0</span></button>
       <button class="navbtn" data-tab="esc"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l9 16H3z"/><path d="M12 9v5M12 17v.5"/></svg>Escalations</button>
+      <button class="navbtn" data-tab="ins"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Insights</button>
       <button class="navbtn" data-tab="new"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New case</button>
       <button class="navbtn" data-tab="sys"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9z"/><path d="M12 11l8-4.5M12 11v9M12 11L4 6.5"/></svg>System map <span style="margin-left:auto;font-size:9.5px;font-weight:700;color:var(--gold-hi);border:1px solid var(--border-strong);border-radius:8px;padding:1px 6px">3D</span></button>
     </nav>
@@ -212,6 +213,11 @@
       <div id="results"></div>
     </section>
 
+    <!-- INSIGHTS -->
+    <section id="tab-ins" class="hide">
+      <div id="insBody"><div class="empty">Loading insights…</div></div>
+    </section>
+
     <!-- SYSTEM MAP (3D) -->
     <section id="tab-sys" class="hide">
       <div class="card full" style="padding:0;overflow:hidden;height:calc(100vh - 170px);min-height:480px;position:relative">
@@ -248,8 +254,8 @@ EXAMPLES.forEach((e,i)=>{const o=document.createElement("option");o.value=i;o.te
 function loadExample(){const e=EXAMPLES[$("#ex").value];if(!e)return;$("#text").value=e.text;$("#cust").value=e.cust}
 loadExample();
 function activate(t){document.querySelectorAll(".navbtn").forEach(x=>x.classList.toggle("active",x.dataset.tab===t));
-  ["queue","esc","new","sys"].forEach(x=>$("#tab-"+x).classList.toggle("hide",x!==t));
-  if(t==="queue")loadQueue(); if(t==="esc")loadEsc();
+  ["queue","esc","new","ins","sys"].forEach(x=>$("#tab-"+x).classList.toggle("hide",x!==t));
+  if(t==="queue")loadQueue(); if(t==="esc")loadEsc(); if(t==="ins")loadInsights();
   if(t==="sys"){const f=$("#sysFrame");if(f&&!f.src)f.src=f.dataset.src;}}
 document.querySelectorAll(".navbtn").forEach(b=>b.onclick=()=>activate(b.dataset.tab));
 document.querySelectorAll(".filterchip").forEach(b=>b.onclick=()=>{FILTER=b.dataset.f;
@@ -315,6 +321,7 @@ async function openCase(id){
               <label>Reply — edit before sending</label>
               <textarea id="apBody" style="min-height:240px">${esc(c.draftBody||"")}</textarea>
               <button class="btn" id="apSend" onclick="approveCase('${esc(c.complaintId)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>Approve &amp; send</button>`}</div>
+        <div class="card full hide" id="intelCard"></div>
         ${(()=>{try{const cit=JSON.parse(c.citations||"[]");if(!cit.length)return"";
           return `<div class="card full"><h3>Grounding sources — the passages behind this draft</h3>${cit.map(x=>`
             <div style="padding:11px 0;border-bottom:1px solid var(--border)">
@@ -329,9 +336,32 @@ async function openCase(id){
       </div>`;
     el.scrollIntoView({behavior:"smooth",block:"start"});
     document.querySelectorAll("#queueBody tr").forEach(tr=>tr.classList.toggle("sel",tr.textContent.includes(id)));
+    loadCaseIntel(id);
   }catch(e){el.innerHTML=`<div class="card full" style="margin-top:18px"><div class="empty">${esc(e.message)}</div></div>`}
 }
 function closeWorkspace(){SELECTED=null;$("#workspace").innerHTML="";loadQueue()}
+// similar past cases + repeat-complainant context (async — fills in after the case renders)
+async function loadCaseIntel(id){
+  const el=document.getElementById("intelCard");if(!el)return;
+  try{
+    const r=await apiFetch(api()+"/api/complaints/"+encodeURIComponent(id)+"/similar");
+    if(!r.ok)throw 0;
+    const d=await r.json();
+    const n=d.customerCaseCount||0, sims=d.similar||[];
+    if(n<2&&!sims.length){el.remove();return;}
+    el.classList.remove("hide");
+    el.innerHTML=`<h3>Case intelligence</h3>
+      ${n>1?`<div class="banner esc" style="margin-bottom:6px">⟳ Repeat complainant — this customer has ${n} cases on record</div>`:""}
+      ${sims.map(s=>`<div class="task" style="cursor:pointer" onclick="openCase('${esc(s.complaintId)}')">
+        <div style="min-width:0"><div class="t" style="font-family:ui-monospace,monospace;font-size:13px">${esc(s.complaintId)}
+          ${s.possibleDuplicate?'<span class="chip risk" style="margin-left:6px;font-size:10px">⚠ possible duplicate</span>':""}
+          ${s.sameCustomer?'<span class="chip gold" style="margin-left:6px;font-size:10px">same customer</span>':""}</div>
+        <div class="m">${esc(s.snippet)}</div></div>
+        <div style="text-align:right;flex:none"><div style="font:700 15px 'Space Grotesk';color:var(--gold-hi)">${Math.round(s.similarity*100)}%</div>
+        <div style="font-size:10px;color:var(--faint)">${esc(s.category||"")} · ${esc(s.status||"")}</div></div></div>`).join("")
+        ||'<div class="empty" style="padding:12px">No similar past cases.</div>'}`;
+  }catch(e){el.remove();}
+}
 const AP_BTN_HTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>Approve &amp; send';
 async function approveCase(id,force){
   const btn=$("#apSend");if(btn){btn.disabled=true;btn.innerHTML='<span class="spin"></span> Sending…';}
@@ -371,6 +401,59 @@ async function sendFollowUp(id,force){
     await openCase(id);
   }catch(e){alert("Follow-up failed: "+e.message);
     if(btn){btn.disabled=false;btn.innerHTML='Send follow-up';}}
+}
+
+// ── insights dashboard ──
+async function loadInsights(){
+  const el=$("#insBody");el.innerHTML='<div class="empty">Loading insights…</div>';
+  try{
+    const d=await (await apiFetch(api()+"/api/insights")).json();
+    const kpi=(label,val,accent)=>`<div class="card" style="text-align:center;padding:20px 12px">
+      <div style="font:700 30px 'Space Grotesk';color:${accent||"var(--text)"}">${val}</div>
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-top:4px">${label}</div></div>`;
+    const maxCat=Math.max(1,...(d.byCategory||[]).map(x=>x.v));
+    const bars=(d.byCategory||[]).slice(0,8).map(x=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:5px 0">
+        <div style="width:190px;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(x.k)}</div>
+        <div style="flex:1;height:10px;border-radius:6px;background:var(--border);overflow:hidden">
+          <div style="width:${Math.round(x.v/maxCat*100)}%;height:100%;background:linear-gradient(90deg,var(--gold-2),var(--gold-hi));transition:width .6s ease"></div></div>
+        <div style="width:34px;text-align:right;font:600 12px 'Space Grotesk';color:var(--gold-hi)">${x.v}</div></div>`).join("");
+    const maxDay=Math.max(1,...(d.byDay||[]).map(x=>x.v));
+    const days=(d.byDay||[]).map(x=>`
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px">
+        <div style="width:70%;height:${Math.max(3,Math.round(x.v/maxDay*72))}px;border-radius:5px 5px 2px 2px;
+          background:${x.v?"linear-gradient(180deg,var(--gold-hi),var(--gold-2))":"var(--border)"}" title="${x.v} case(s)"></div>
+        <div style="font-size:8.5px;color:var(--faint)">${esc(x.d)}</div></div>`).join("");
+    const q=d.draftQuality||{};
+    const flags=(d.riskFlags||[]).map(x=>`<span class="chip risk" style="margin:3px 4px 0 0">⚠ ${esc(x.k)} · ${x.v}</span>`).join("")||'<span class="chip ok">no risk flags recorded</span>';
+    const sla=(d.slaWatch||[]).map(w=>`
+      <tr class="clickable" onclick="activate('queue');openCase('${esc(w.complaintId)}')">
+        <td style="font-family:ui-monospace,monospace;font-size:12px">${esc(w.complaintId)}</td>
+        <td>${esc(w.category||"—")}</td><td>${urgencyChip(w.urgency)}</td>
+        <td style="color:${w.overdue?"var(--danger)":"var(--warn)"};font-weight:600">${w.overdue?"OVERDUE":"due "+fmt(w.resolutionDue)}</td></tr>`).join("");
+    const rep=(d.repeatCustomers||[]).map(r=>`<div class="kv"><span class="k" style="font-family:ui-monospace,monospace;font-size:12px">${esc(r.customer)}</span><span class="v">${r.cases} cases</span></div>`).join("");
+    el.innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
+        ${kpi("cases (recent 500)",d.total)}${kpi("in review",d.inReview,"var(--gold-hi)")}
+        ${kpi("escalation rate",Math.round((d.escalationRate||0)*100)+"%","var(--danger)")}
+        ${kpi("SLA watchlist",(d.slaWatch||[]).length,(d.slaWatch||[]).some(w=>w.overdue)?"var(--danger)":"var(--warn)")}
+      </div>
+      <div class="grid">
+        <div class="card"><h3>Complaints by category</h3>${bars||'<div class="empty">No cases yet.</div>'}</div>
+        <div class="card"><h3>Daily volume — last 14 days</h3>
+          <div style="display:flex;align-items:flex-end;gap:3px;height:100px;padding-top:10px">${days}</div></div>
+        <div class="card"><h3>AI draft quality (learning loop)</h3>
+          <div class="metric"><b>${q.uneditedPct==null?"—":q.uneditedPct+"%"}</b><span style="color:var(--muted);font-size:12.5px">sent without any operator edit</span></div>
+          <div class="kv" style="margin-top:10px"><span class="k">Scored approvals</span><span class="v">${q.scoredCases||0}</span></div>
+          <div class="kv"><span class="k">Avg edit similarity</span><span class="v">${q.avgEditSimilarity==null?"—":Math.round(q.avgEditSimilarity*100)+"%"}</span></div>
+          <div style="font-size:11px;color:var(--faint);margin-top:8px">Rising unedited % = drafts getting good enough to ship. Export: <span style="font-family:ui-monospace,monospace">GET /api/training-data</span></div></div>
+        <div class="card"><h3>Risk signals & repeat customers</h3>
+          <div class="chips" style="margin-top:2px">${flags}</div>
+          ${rep?`<div style="margin-top:14px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint)">Repeat complainants</div>${rep}`:""}</div>
+        <div class="card full"><h3>SLA watchlist — resolve-by dates approaching</h3>
+          ${sla?`<table><thead><tr><th>Case</th><th>Category</th><th>Urgency</th><th>Deadline</th></tr></thead><tbody>${sla}</tbody></table>`:'<div class="empty">Nothing due within 5 days — all clear.</div>'}</div>
+      </div>`;
+  }catch(e){el.innerHTML=`<div class="card full"><div class="empty">${esc(e.message)} — enter your operator API key in the sidebar.</div></div>`}
 }
 
 // ── escalations ──

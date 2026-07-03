@@ -34,6 +34,10 @@ public class CaseRecord {
     @Column(columnDefinition = "text")
     private String citations;
 
+    /** Local embedding of the complaint (JSON float array) — powers similar-case search. */
+    @Column(columnDefinition = "text")
+    private String embedding;
+
     private String category;
     private double confidence;
 
@@ -96,6 +100,9 @@ public class CaseRecord {
 
     public String getCitations() { return citations; }
     public void setCitations(String v) { this.citations = v; }
+
+    public String getEmbedding() { return embedding; }
+    public void setEmbedding(String v) { this.embedding = v; }
 
     public String getComplaintText() { return complaintText; }
     public void setComplaintText(String v) { this.complaintText = v; }

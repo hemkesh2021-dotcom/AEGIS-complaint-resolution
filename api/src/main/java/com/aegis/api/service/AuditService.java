@@ -25,10 +25,13 @@ public class AuditService {
 
     private final CaseRepository cases;
     private final AuditEventRepository events;
+    private final CaseIntelligenceService intelligence;
 
-    public AuditService(CaseRepository cases, AuditEventRepository events) {
+    public AuditService(CaseRepository cases, AuditEventRepository events,
+                        CaseIntelligenceService intelligence) {
         this.cases = cases;
         this.events = events;
+        this.intelligence = intelligence;
     }
 
     /** 128-bit unguessable customer tracking token (the public status endpoint's only key). */
@@ -50,6 +53,7 @@ public class AuditService {
         c.setDraftWarnings(draftWarnings == null || draftWarnings.isEmpty()
                 ? null : String.join("\n", draftWarnings));
         c.setCitations(citationsJson == null || citationsJson.isBlank() ? "[]" : citationsJson);
+        c.setEmbedding(intelligence.embedJson(complaintText)); // powers similar-case search
         c.setCategory(r.prediction().label());
         c.setConfidence(r.prediction().confidence());
         c.setClause(r.compliance().clause());
