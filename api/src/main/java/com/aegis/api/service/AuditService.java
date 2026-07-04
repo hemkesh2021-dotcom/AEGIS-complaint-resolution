@@ -68,10 +68,16 @@ public class AuditService {
         c.setStatus(r.status());
         c.setUrgency(r.urgency());
         c.setChannel(r.channel());
+        c.setLanguage(r.language());
         c.setCreatedAt(Instant.now());
         cases.save(c);
 
         String id = r.complaintId();
+        if (r.language() != null && !"English".equals(r.language())) {
+            events.save(new AuditEvent(id, "language",
+                    "detected " + r.language() + " — translated to English for the pipeline; "
+                    + "reply drafted in " + r.language()));
+        }
         events.save(new AuditEvent(id, "classify",
                 "label=" + r.prediction().label() + " confidence=" + r.prediction().confidence()));
         events.save(new AuditEvent(id, "compliance",

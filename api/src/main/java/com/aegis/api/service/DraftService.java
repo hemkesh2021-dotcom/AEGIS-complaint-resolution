@@ -82,12 +82,23 @@ public class DraftService {
 
     public Draft draft(String customerName, String complaintId, String category,
                        String summary, Compliance compliance, RetrievedContext context) {
+        return draft(customerName, complaintId, category, summary, compliance, context, null);
+    }
+
+    /** @param replyLanguage language NAME (e.g. "Hindi") to write the reply in; null = English */
+    public Draft draft(String customerName, String complaintId, String category,
+                       String summary, Compliance compliance, RetrievedContext context,
+                       String replyLanguage) {
         ChatModel chatModel = chatModelProvider.getIfAvailable();
         if (chatModel != null) {
             try {
+                String langRule = replyLanguage == null ? ""
+                        : " Write the ENTIRE reply (including the Subject line) in " + replyLanguage
+                        + " — the customer wrote in that language. Keep all amounts, dates, and "
+                        + "reference numbers exactly as given; keep the literal prefix 'Subject:' in English.";
                 String reply = ChatClient.create(chatModel)
                         .prompt()
-                        .system(SYSTEM_PROMPT)
+                        .system(SYSTEM_PROMPT + langRule)
                         .user(buildPrompt(complaintId, category, summary, compliance, context))
                         .call()
                         .content();

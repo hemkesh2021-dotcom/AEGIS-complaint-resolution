@@ -12,7 +12,8 @@ public record ComplaintResponse(
         Escalation escalation,
         String urgency,
         String status,
-        String channel) {
+        String channel,
+        String language) {
 
     /** Phase 2 — classifier output. */
     public record Prediction(String label, double confidence) {

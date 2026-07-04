@@ -63,6 +63,7 @@ public class CaseRecord {
     private String status;   // IN_REVIEW → SENT
     private String urgency;  // CRITICAL / PRIORITIZED / NORMAL
     private String channel;  // WEB / CONSOLE (EMAIL later)
+    private String language; // detected complaint language (name, e.g. "Hindi")
 
     @Column(columnDefinition = "text")
     private String finalSubject;
@@ -151,6 +152,9 @@ public class CaseRecord {
 
     public String getChannel() { return channel; }
     public void setChannel(String v) { this.channel = v; }
+
+    public String getLanguage() { return language; }
+    public void setLanguage(String v) { this.language = v; }
 
     public String getFinalSubject() { return finalSubject; }
     public void setFinalSubject(String v) { this.finalSubject = v; }

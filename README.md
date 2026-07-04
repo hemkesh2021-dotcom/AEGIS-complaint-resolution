@@ -18,6 +18,7 @@ A **Spring Boot** (Java 21) orchestrator chains seven phases — ingest → clas
 - **Hybrid, citation-pinned retrieval.** Semantic search (pgvector) fused with keyword BM25 via reciprocal-rank fusion — embeddings catch paraphrase, BM25 catches exact regulatory vocabulary. Every case stores the exact passages that grounded its draft, and the operator sees them as "Grounding sources" before approving. If pgvector is down, retrieval degrades to keyword-only instead of failing.
 - **A learning loop, closed.** Every approval is implicit feedback: the edit-similarity between AI draft and human-approved final is computed, audited, and exported at `GET /api/training-data` as labeled retraining examples.
 - **Case intelligence built in.** Every complaint is embedded at intake (same local model as RAG); operators see similar past cases with duplicate and repeat-complainant flags, and an **Insights** dashboard tracks trends, SLA breaches approaching, risk-signal mix, and how often the AI's drafts ship unedited.
+- **Multilingual intake.** Customers complain in their own language (Hindi, Kannada, Tamil, Spanish, German, …) — detection is deterministic (Unicode scripts + stopword voting, no extra models), the pipeline works on a redacted English translation, and the reply is drafted back in the customer's language. No LLM available → graceful English degradation.
 - **Honestly evaluated.** Accuracy is measured on a *temporal holdout* refreshed from the live CFPB API — not a curated demo set (see [Evaluation](#evaluation)).
 - **Explainable by default.** Deadlines, risk flags, escalation, and urgency are deterministic rules with recorded reasons — ML only where it earns its place, and low classifier confidence auto-escalates to a human.
 
@@ -115,6 +116,29 @@ The deterministic core is unit-tested (`mvn test`; runs on every CI push):
 - **EscalationDecider** — risk-flag and confidence-threshold behavior, including the 0.55 boundary.
 - **ApiKeyFilter** — 401 without key, public paths open, per-IP rate limits on intake *and* status, fail-closed when unconfigured.
 
+## Load testing
+
+`loadtest/k6.js` benchmarks the honest compute path (`POST /api/eval`: classify → compliance → escalation → hybrid retrieval, no LLM/DB) with a ramp to 60 VUs, and simultaneously hammers the public status endpoint to *prove the rate limiter holds* (429s there are the success condition):
+
+```bash
+docker run --rm -i --add-host=host.docker.internal:host-gateway \
+  -e BASE_URL=http://host.docker.internal:8080 \
+  -e API_KEY=$AEGIS_API_KEY \
+  grafana/k6 run - < loadtest/k6.js
+```
+
+Thresholds: pipeline p95 < 1.5s, p50 < 600ms; status p95 < 250ms; check pass-rate > 99%.
+
+**Measured** (M-series MacBook, full Docker stack, 2-minute run, ramp to 60 VUs):
+
+| Metric | Result |
+|---|--:|
+| Requests | 7,585 · ~63 req/s sustained |
+| Pipeline latency (classify → compliance → escalate → hybrid retrieve) | p50 **303ms** · p95 **774ms** · p99 **898ms** |
+| Rate-limited status endpoint | p95 **12.7ms** |
+| Checks passed / failed requests | **100%** / 0 |
+| Fake tracking tokens leaked under load | **0** (404/429 only) |
+
 ## Security
 
 Defense in depth, documented in full in [SECURITY.md](SECURITY.md):
@@ -141,7 +165,7 @@ Deploys the classifier (private) and the API (public, wired to the classifier UR
 
 ## Roadmap
 
-OAuth2/OIDC with operator roles + maker-checker approval · inbound email intake · cross-encoder reranking on top of hybrid retrieval · periodic retraining job over `/api/training-data` · multilingual intake · k6 load-test benchmarks.
+OAuth2/OIDC with operator roles + maker-checker approval · inbound email intake · cross-encoder reranking on top of hybrid retrieval · periodic retraining job over `/api/training-data`.
 
 ## Contributing
 

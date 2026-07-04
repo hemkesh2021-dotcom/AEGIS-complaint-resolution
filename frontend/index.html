@@ -303,6 +303,7 @@ async function openCase(id){
           <div class="email"><div class="body" style="max-height:150px">${esc(c.complaintText)}</div></div>
           <div class="kv" style="margin-top:12px"><span class="k">Category</span><span class="v">${esc(c.category)} · ${conf}%</span></div>
           <div class="conf"><div style="width:${conf}%"></div></div>
+          ${c.language&&c.language!=="English"?`<div class="kv"><span class="k">Language</span><span class="v" style="color:var(--info)">⛁ ${esc(c.language)} — translated for pipeline · reply drafted in ${esc(c.language)}</span></div>`:""}
           <div class="kv"><span class="k">Clause</span><span class="v" style="max-width:58%">${esc(c.clause)}</span></div>
           <div class="kv"><span class="k">Acknowledge by</span><span class="v">${fmt(c.ackDue)}</span></div>
           <div class="kv"><span class="k">Resolve by</span><span class="v">${fmt(c.resolutionDue)}</span></div>
