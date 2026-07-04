@@ -1,5 +1,6 @@
 package com.aegis.api;
 
+import com.aegis.api.service.OidcAuth;
 import com.aegis.api.service.RateLimiter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -8,6 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,22 +37,30 @@ public class ApiKeyFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(ApiKeyFilter.class);
 
+    /** Request attributes set for downstream authorization (maker-checker, audit). */
+    public static final String ATTR_ACTOR = "aegis.actor";
+    public static final String ATTR_ROLES = "aegis.roles";
+    public static final String ROLE_OPERATOR = "operator";
+    public static final String ROLE_SUPERVISOR = "supervisor";
+
     private final String apiKey;
     private final int intakePerMinute;
     private final int statusPerMinute;
     private final boolean trustProxy;
     private final RateLimiter rateLimiter;
+    private final OidcAuth oidc;
 
     public ApiKeyFilter(@Value("${aegis.api-key:}") String apiKey,
                         @Value("${aegis.intake-rate-per-minute:20}") int intakePerMinute,
                         @Value("${aegis.status-rate-per-minute:60}") int statusPerMinute,
                         @Value("${aegis.trust-proxy:false}") boolean trustProxy,
-                        RateLimiter rateLimiter) {
+                        RateLimiter rateLimiter, OidcAuth oidc) {
         this.apiKey = apiKey == null ? "" : apiKey.trim();
         this.intakePerMinute = intakePerMinute;
         this.statusPerMinute = statusPerMinute;
         this.trustProxy = trustProxy;
         this.rateLimiter = rateLimiter;
+        this.oidc = oidc;
     }
 
     @Override
@@ -87,7 +97,25 @@ public class ApiKeyFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Protected endpoints require a valid API key.
+        // Protected endpoints: OIDC bearer token (real identity + roles) OR the
+        // API key (break-glass/dev — full access, actor recorded as "api-key").
+        String authz = req.getHeader("Authorization");
+        if (authz != null && authz.regionMatches(true, 0, "Bearer ", 0, 7)) {
+            OidcAuth.Principal p = oidc.authenticate(authz.substring(7).trim());
+            if (p == null) {
+                deny(res, 401, "{\"error\":\"invalid or expired token\"}");
+                return;
+            }
+            if (!p.roles().contains(ROLE_OPERATOR)) {
+                deny(res, 403, "{\"error\":\"operator role required\"}");
+                return;
+            }
+            req.setAttribute(ATTR_ACTOR, p.username());
+            req.setAttribute(ATTR_ROLES, p.roles());
+            chain.doFilter(req, res);
+            return;
+        }
+
         if (apiKey.isEmpty()) {
             log.error("aegis.api-key not configured — refusing protected request to {}", path);
             deny(res, 503, "{\"error\":\"server not configured\"}");
@@ -98,6 +126,8 @@ public class ApiKeyFilter extends OncePerRequestFilter {
             deny(res, 401, "{\"error\":\"unauthorized\"}");
             return;
         }
+        req.setAttribute(ATTR_ACTOR, "api-key");
+        req.setAttribute(ATTR_ROLES, Set.of(ROLE_OPERATOR, ROLE_SUPERVISOR));
         chain.doFilter(req, res);
     }
 

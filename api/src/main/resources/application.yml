@@ -20,6 +20,10 @@ aegis:
     from: ${AEGIS_MAIL_FROM:AEGIS Customer Care <care@aegis.local>}
   # Base URL used in customer emails for the tracking link.
   public-base-url: ${AEGIS_PUBLIC_BASE_URL:http://localhost:8088}
+  # OIDC operator SSO (Keycloak). Both empty = bearer tokens rejected, API key only.
+  oidc:
+    issuer-uri: ${AEGIS_OIDC_ISSUER:}
+    jwk-set-uri: ${AEGIS_OIDC_JWKS:}
 
 spring:
   application:

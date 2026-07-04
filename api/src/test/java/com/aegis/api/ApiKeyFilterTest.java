@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import com.aegis.api.service.OidcAuth;
 import com.aegis.api.service.RateLimiter;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -33,7 +35,8 @@ class ApiKeyFilterTest {
     }
 
     private static ApiKeyFilter filter(String key, int intake, int status, boolean trustProxy) {
-        return new ApiKeyFilter(key, intake, status, trustProxy, newLimiter());
+        // OIDC unconfigured — bearer tokens must be rejected, API key path unaffected
+        return new ApiKeyFilter(key, intake, status, trustProxy, newLimiter(), new OidcAuth("", ""));
     }
 
     private MockHttpServletResponse run(ApiKeyFilter filter, String method, String uri, String key)
@@ -124,6 +127,32 @@ class ApiKeyFilterTest {
     void missingServerKeyFailsClosedNotOpen() throws Exception {
         ApiKeyFilter f = filter("", 100, 100, false);
         assertEquals(503, run(f, "GET", "/api/complaints", "anything").getStatus());
+    }
+
+    @Test
+    void bearerTokensRejectedWhenOidcUnconfigured() throws Exception {
+        ApiKeyFilter f = filter(KEY, 100, 100, false);
+        MockHttpServletRequest req = new MockHttpServletRequest("GET", "/api/complaints");
+        req.setRequestURI("/api/complaints");
+        req.addHeader("Authorization", "Bearer some.jwt.token");
+        MockHttpServletResponse res = new MockHttpServletResponse();
+        f.doFilter(req, res, new MockFilterChain());
+        assertEquals(401, res.getStatus(), "no OIDC configured → bearer must not pass");
+    }
+
+    @Test
+    void apiKeyGrantsSupervisorRoleForMakerChecker() throws Exception {
+        ApiKeyFilter f = filter(KEY, 100, 100, false);
+        MockHttpServletRequest req = new MockHttpServletRequest("GET", "/api/complaints");
+        req.setRequestURI("/api/complaints");
+        req.addHeader("X-API-Key", KEY);
+        MockHttpServletResponse res = new MockHttpServletResponse();
+        f.doFilter(req, res, new MockFilterChain());
+        assertEquals("api-key", req.getAttribute(ApiKeyFilter.ATTR_ACTOR));
+        Object roles = req.getAttribute(ApiKeyFilter.ATTR_ROLES);
+        assertEquals(true, roles instanceof Set<?> s
+                && s.contains(ApiKeyFilter.ROLE_OPERATOR)
+                && s.contains(ApiKeyFilter.ROLE_SUPERVISOR));
     }
 
     @Test

@@ -143,13 +143,14 @@ Thresholds: pipeline p95 < 1.5s, p50 < 600ms; status p95 < 250ms; check pass-rat
 
 Defense in depth, documented in full in [SECURITY.md](SECURITY.md):
 
-- **Auth:** operator endpoints + `/actuator/metrics` behind `X-API-Key` (constant-time compare); only intake, status, and health are public.
+- **Auth:** operator endpoints accept **OIDC bearer tokens** (Keycloak SSO — real identities, `operator`/`supervisor` roles, PKCE login in the console) or the `X-API-Key` break-glass/dev key (constant-time compare); only intake, status, and health are public. Every approval and follow-up records **who** did it.
+- **Maker-checker:** CRITICAL and escalated cases can only be approved by a `supervisor` — an operator's attempt is refused with 403 and the refusal itself is audit-trailed. Console logins: `operator1/operator`, `supervisor1/supervisor` (Keycloak admin at http://localhost:8089, admin/admin).
 - **AI-output safety:** the grounding gate blocks invented figures, contacts, and template debris at draft *and* send time; overrides are audited.
 - **Data protection:** PII redaction + name tokenization before any external LLM call; 128-bit tracking tokens; retention purge job.
 - **Abuse resistance:** per-IP rate limits on intake (LLM-cost abuse) and status (token guessing), **Redis-backed** so they hold across replicas (in-memory fallback, never fails open); `X-Forwarded-For` honored only behind a trusted proxy (`AEGIS_TRUST_PROXY`); 8 KB input cap; suppressed stack traces; non-root containers.
 - **Supply chain:** gitleaks secret-scanning in CI (full history); Dependabot across Maven, pip, Actions, and Dockerfiles.
 
-**For production:** replace the shared key with OAuth2/OIDC + roles, terminate TLS behind a WAF, and move secrets to a secret manager.
+**For production:** disable the shared API key (leave `AEGIS_API_KEY` empty and rely on OIDC only), terminate TLS behind a WAF, and move secrets to a secret manager.
 
 ## CI
 
@@ -165,7 +166,7 @@ Deploys the classifier (private) and the API (public, wired to the classifier UR
 
 ## Roadmap
 
-OAuth2/OIDC with operator roles + maker-checker approval · inbound email intake · cross-encoder reranking on top of hybrid retrieval · periodic retraining job over `/api/training-data`.
+Cloud Run deployment (public demo) · inbound email intake · cross-encoder reranking on top of hybrid retrieval · periodic retraining job over `/api/training-data`.
 
 ## Contributing
 

@@ -167,6 +167,11 @@
       <div class="status-row" style="margin-top:6px;padding-top:8px;border-top:1px solid var(--border)"><a href="inbox.html" style="color:var(--muted);text-decoration:none;font-size:12.5px">✉ AEGIS Mail — customer inbox →</a></div>
     </div>
     <div class="spacer"></div>
+    <div class="panel" id="ssoPanel">
+      <div class="status-title">Identity</div>
+      <div id="ssoState"><button class="btn ghost" style="margin:0;width:100%;padding:9px" onclick="ssoLogin()">🔐 Sign in with SSO</button>
+      <div style="font-size:10.5px;color:var(--faint);margin-top:7px;line-height:1.5">operator1 / operator · supervisor1 / supervisor<br>or use the API key below (full access)</div></div>
+    </div>
     <div class="settings">API endpoint<input id="apiBase" type="text" value="http://localhost:8080" /></div>
     <div class="settings" style="margin-top:8px">Operator API key<input id="apiKey" type="password" placeholder="X-API-Key" autocomplete="off" /></div>
   </aside>
@@ -239,7 +244,57 @@ const EXAMPLES=[
 ];
 const $=s=>document.querySelector(s), api=()=>$("#apiBase").value.replace(/\/$/,"");
 const KEY=()=>(($("#apiKey")&&$("#apiKey").value)||localStorage.getItem("aegisKey")||"");
-function apiFetch(u,o){o=o||{};o.headers=Object.assign({"X-API-Key":KEY()},o.headers||{});return fetch(u,o);}
+
+// ── SSO (OIDC authorization-code + PKCE against Keycloak, no libraries) ──
+const KC=()=>localStorage.getItem("aegisKc")||"http://localhost:8089";
+const KC_REALM="aegis", KC_CLIENT="aegis-console";
+const kcUrl=p=>`${KC()}/realms/${KC_REALM}/protocol/openid-connect/${p}`;
+function b64url(buf){return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")}
+async function ssoLogin(){
+  const verifier=b64url(crypto.getRandomValues(new Uint8Array(48)));
+  sessionStorage.setItem("pkceVerifier",verifier);
+  const challenge=b64url(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(verifier)));
+  const redirect=location.origin+location.pathname;
+  location.href=kcUrl("auth")+`?client_id=${KC_CLIENT}&response_type=code&scope=openid`
+    +`&redirect_uri=${encodeURIComponent(redirect)}&code_challenge=${challenge}&code_challenge_method=S256`;
+}
+async function ssoHandleCallback(){
+  const code=new URLSearchParams(location.search).get("code");
+  if(!code)return;
+  try{
+    const r=await fetch(kcUrl("token"),{method:"POST",
+      headers:{"Content-Type":"application/x-www-form-urlencoded"},
+      body:new URLSearchParams({grant_type:"authorization_code",client_id:KC_CLIENT,code,
+        redirect_uri:location.origin+location.pathname,
+        code_verifier:sessionStorage.getItem("pkceVerifier")||""})});
+    if(r.ok)sessionStorage.setItem("sso",JSON.stringify(await r.json()));
+  }catch(e){}
+  history.replaceState({},"",location.pathname);
+}
+function ssoToken(){const t=JSON.parse(sessionStorage.getItem("sso")||"null");return t&&t.access_token||null}
+function ssoClaims(){
+  const tok=ssoToken();if(!tok)return null;
+  try{return JSON.parse(atob(tok.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")))}catch(e){return null}
+}
+function ssoLogout(){sessionStorage.removeItem("sso");renderSso();loadQueue();}
+function renderSso(){
+  const c=ssoClaims(),el=$("#ssoState");if(!el)return;
+  if(!c)return; // login button markup is the static default
+  const roles=((c.realm_access||{}).roles||[]).filter(r=>r==="operator"||r==="supervisor");
+  const sup=roles.includes("supervisor");
+  el.innerHTML=`<div class="status-row" style="padding:2px 0"><span class="dot green"></span>
+      <span><b style="color:var(--text)">${esc(c.preferred_username||"user")}</b></span></div>
+    <div style="margin:4px 0 8px">${roles.map(r=>`<span class="chip ${r==="supervisor"?"gold":""}" style="font-size:10px;margin-right:4px">${r}</span>`).join("")}</div>
+    ${sup?"":'<div style="font-size:10px;color:var(--warn);margin-bottom:8px">⚠ CRITICAL cases need a supervisor</div>'}
+    <button class="btn ghost" style="margin:0;width:100%;padding:7px;font-size:12px" onclick="ssoLogout()">Sign out</button>`;
+}
+
+function apiFetch(u,o){
+  o=o||{};
+  const tok=ssoToken();
+  o.headers=Object.assign(tok?{"Authorization":"Bearer "+tok}:{"X-API-Key":KEY()},o.headers||{});
+  return fetch(u,o);
+}
 let FILTER="review", SELECTED=null;
 
 function esc(s){return (s==null?"":String(s)).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
@@ -369,6 +424,12 @@ async function approveCase(id,force){
   const subj=($("#apSubj")||{}).value||"", body=($("#apBody")||{}).value||"";
   try{
     const r=await apiFetch(api()+"/api/complaints/"+encodeURIComponent(id)+"/approve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subject:subj,body:body,force:!!force})});
+    if(r.status===403){
+      const d=await r.json().catch(()=>({}));
+      if(btn){btn.disabled=false;btn.innerHTML=AP_BTN_HTML;}
+      alert("⛔ "+(d.error||"Supervisor role required.")+"\n\nSign in as supervisor1 to approve this case — the refusal has been recorded in the audit trail.");
+      return;
+    }
     if(r.status===422){
       // The grounding check blocked the send (invented figures, placeholders, raw timestamps…)
       const d=await r.json().catch(()=>({issues:["unknown issue"]}));
@@ -511,7 +572,7 @@ async function checkStatus(){
 $("#apiBase").addEventListener("change",()=>{checkStatus();loadQueue()});
 $("#apiKey").value=localStorage.getItem("aegisKey")||"";
 $("#apiKey").addEventListener("change",()=>{localStorage.setItem("aegisKey",$("#apiKey").value);loadQueue();});
-checkStatus();loadQueue();
+ssoHandleCallback().then(()=>{renderSso();checkStatus();loadQueue();});
 
 // ── ambient gold-dust background (skipped for reduced-motion) ──
 (()=>{

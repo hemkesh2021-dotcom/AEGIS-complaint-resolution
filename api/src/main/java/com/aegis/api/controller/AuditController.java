@@ -1,7 +1,9 @@
 package com.aegis.api.controller;
 
+import com.aegis.api.ApiKeyFilter;
 import com.aegis.api.dto.CaseView;
 import com.aegis.api.entity.AuditEvent;
+import jakarta.servlet.http.HttpServletRequest;
 import com.aegis.api.entity.CaseMessage;
 import com.aegis.api.entity.CaseRecord;
 import com.aegis.api.repo.AuditEventRepository;
@@ -91,13 +93,25 @@ public class AuditController {
 
     @PostMapping("/complaints/{id}/approve")
     public ResponseEntity<Object> approve(@PathVariable String id,
-                                          @RequestBody(required = false) ApproveRequest req) {
+                                          @RequestBody(required = false) ApproveRequest req,
+                                          HttpServletRequest http) {
+        String actor = actor(http);
         return cases.findById(id).<ResponseEntity<Object>>map(c -> {
             // Sent communications are immutable — the customer has already seen them.
             // Corrections and updates go through POST /complaints/{id}/follow-up.
             if ("SENT".equals(c.getStatus())) {
                 return ResponseEntity.status(409).body((Object) Map.of(
                         "error", "this reply was already sent and is immutable — send a follow-up instead"));
+            }
+
+            // Maker-checker: CRITICAL or escalated cases need a supervisor's sign-off.
+            boolean highStakes = "CRITICAL".equals(c.getUrgency()) || c.isEscalate();
+            if (highStakes && !hasRole(http, ApiKeyFilter.ROLE_SUPERVISOR)) {
+                events.save(new AuditEvent(id, "maker-checker",
+                        "approval by '" + actor + "' REFUSED — CRITICAL/escalated cases require the supervisor role"));
+                return ResponseEntity.status(403).body((Object) Map.of(
+                        "error", "maker-checker: CRITICAL and escalated cases require a supervisor to approve",
+                        "requiredRole", ApiKeyFilter.ROLE_SUPERVISOR));
             }
             String subject = (req != null && req.subject() != null && !req.subject().isBlank())
                     ? req.subject() : c.getDraftSubject();
@@ -130,9 +144,9 @@ public class AuditController {
             events.save(new AuditEvent(id, "learning", edited
                     ? String.format("operator edited the draft before sending (similarity %.2f) — captured for retraining", sim)
                     : "draft sent unedited — positive training signal"));
-            events.save(new AuditEvent(id, "approved", issues.isEmpty()
-                    ? "CS reviewed, approved, and sent the reply"
-                    : "CS sent with OVERRIDE despite grounding issues: " + String.join(" | ", issues)));
+            events.save(new AuditEvent(id, "approved", "by '" + actor + "' — " + (issues.isEmpty()
+                    ? "reviewed, approved, and sent the reply"
+                    : "sent with OVERRIDE despite grounding issues: " + String.join(" | ", issues))));
             email.sendResponse(c);                            // real delivery, audited
             caseEvents.publish(c.getTrackingToken(), "update"); // push to any open portal page
             return ResponseEntity.ok((Object) c);
@@ -149,7 +163,9 @@ public class AuditController {
 
     @PostMapping("/complaints/{id}/follow-up")
     public ResponseEntity<Object> followUp(@PathVariable String id,
-                                           @RequestBody(required = false) FollowUpRequest req) {
+                                           @RequestBody(required = false) FollowUpRequest req,
+                                           HttpServletRequest http) {
+        String actor = actor(http);
         return cases.findById(id).<ResponseEntity<Object>>map(c -> {
             if (!"SENT".equals(c.getStatus())) {
                 return ResponseEntity.status(409).body((Object) Map.of(
@@ -175,9 +191,9 @@ public class AuditController {
             }
 
             CaseMessage m = messages.save(new CaseMessage(id, subject, req.body()));
-            events.save(new AuditEvent(id, "follow-up", issues.isEmpty()
-                    ? "operator sent a follow-up: " + subject
-                    : "follow-up sent with OVERRIDE despite grounding issues: " + String.join(" | ", issues)));
+            events.save(new AuditEvent(id, "follow-up", "by '" + actor + "' — " + (issues.isEmpty()
+                    ? "sent a follow-up: " + subject
+                    : "sent with OVERRIDE despite grounding issues: " + String.join(" | ", issues))));
             email.sendFollowUp(c, subject, req.body());
             caseEvents.publish(c.getTrackingToken(), "update");
             return ResponseEntity.ok((Object) m);
@@ -211,6 +227,16 @@ public class AuditController {
 
     private static String nzs(String s) {
         return s == null ? "" : s;
+    }
+
+    private static String actor(HttpServletRequest http) {
+        Object a = http.getAttribute(ApiKeyFilter.ATTR_ACTOR);
+        return a == null ? "unknown" : String.valueOf(a);
+    }
+
+    private static boolean hasRole(HttpServletRequest http, String role) {
+        Object roles = http.getAttribute(ApiKeyFilter.ATTR_ROLES);
+        return roles instanceof java.util.Set<?> set && set.contains(role);
     }
 
     private String retrievedContext(String complaintText) {
