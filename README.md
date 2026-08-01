@@ -31,11 +31,16 @@ aegis-v2/
 │   ├── src/main/resources/{application.yml,regulations.json,templates.json,knowledge/kb.json}
 │   └── src/test/java/…                  unit tests (grounding gate, compliance clocks, security filter…)
 ├── classifier/   Python FastAPI serving fine-tuned DistilBERT (+ heuristic fallback)
+├── data/         Curated CFPB training dataset (8,800 labelled narratives)
 ├── frontend/     portal.html (customer) · index.html (operator console) · architecture.html (3D)
 ├── eval/         behavioral suite + CFPB temporal-holdout harness
 ├── infra/        deploy.sh — Cloud Run deploy for both services
 └── docker-compose.yml   local end-to-end (classifier + api + Postgres/pgvector + nginx)
 ```
+
+The bundled [`data/cfpb_complaints.csv`](data/cfpb_complaints.csv) contains a
+balanced, 8,800-record CFPB training snapshot. Its schema, provenance, and
+safe-use notes are in [`data/README.md`](data/README.md).
 
 ## Quickstart
 
