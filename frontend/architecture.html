@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>AEGIS · System Architecture</title>
+<link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -19,6 +20,12 @@
   #scene.dragging{cursor:grabbing}
   #vignette{position:fixed;inset:0;z-index:2;pointer-events:none;
     background:radial-gradient(120% 90% at 50% 42%,transparent 55%,rgba(5,4,2,.62) 100%)}
+  #renderProfile{position:fixed;z-index:5;right:22px;bottom:92px;display:flex;align-items:center;gap:8px;
+    color:var(--muted);font-size:10.5px;background:rgba(12,10,8,.68);border:1px solid var(--border);
+    border-radius:12px;padding:8px 11px;backdrop-filter:blur(12px);pointer-events:none}
+  #renderProfile b{color:var(--ok);font-family:'Space Grotesk';font-size:10px;letter-spacing:.08em}
+  #renderProfile .meter{width:28px;height:3px;background:rgba(91,191,146,.2);border-radius:3px;overflow:hidden}
+  #renderProfile .meter::after{content:"";display:block;width:100%;height:100%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
   .hud{position:fixed;z-index:5;pointer-events:none}
   .hud *{pointer-events:auto}
   /* top bar */
@@ -104,7 +111,9 @@
   #panel .x{position:absolute;top:12px;right:16px;color:var(--faint);cursor:pointer;font-size:19px;line-height:1;transition:.2s}
   #panel .x:hover{color:var(--gold-hi);transform:rotate(90deg)}
   #fallback{position:fixed;inset:0;display:none;place-items:center;color:var(--muted);font-size:14px;text-align:center;padding:30px}
-  @media(max-width:720px){.stats{display:none}.legend{display:none}.tagline{display:none}#panel{left:12px;right:12px;width:auto}}
+  @media(max-width:720px){.stats,.legend,.tagline,#renderProfile{display:none}.topbar{padding:12px}.brand small{display:none}
+    .navlinks a:first-child{display:none}.navlinks a{padding:7px 10px}.rail{justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;
+    padding:12px 10px 16px}.phase,.playbtn{flex:none}#panel{top:64px;left:12px;right:12px;width:auto;max-height:calc(100vh - 150px)}}
   @media (prefers-reduced-motion: reduce){*{animation-duration:.01s!important}}
 </style>
 </head>
@@ -124,7 +133,7 @@
 <div class="hud stats">
   <div class="stat"><span class="dot" id="apiDot"></span><span id="apiTxt">Checking live API…</span></div>
   <div class="stat"><b>11</b>&nbsp;CFPB categories · DistilBERT</div>
-  <div class="stat"><b>0.93</b>&nbsp;escalation F1 ·&nbsp;<b>94%</b>&nbsp;retrieval hit-rate</div>
+  <div class="stat"><b>0.93</b>&nbsp;escalation F1 ·&nbsp;<b>100%</b>&nbsp;retrieval hit-rate</div>
   <div class="stat"><b>ON</b>&nbsp;grounding gate + PII redaction</div>
 </div>
 
@@ -137,6 +146,7 @@
 </div>
 
 <div id="hint">drag to orbit · scroll to zoom · click any component · double-click to reset</div>
+<div id="renderProfile"><b id="qualityLabel">ULTRA</b><span id="renderStats">initializing renderer</span><span class="meter"></span></div>
 
 <div class="hud rail" id="rail">
   <button class="playbtn" id="play">❚❚ pause journey</button>
@@ -147,6 +157,14 @@
 <div id="fallback">Your browser couldn't start WebGL.<br>The 3D architecture view needs hardware acceleration enabled.</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/Pass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/FXAAShader.js"></script>
 <script>
 "use strict";
 const $=s=>document.querySelector(s);
@@ -154,23 +172,28 @@ const EMBED=new URLSearchParams(location.search).has("embed");
 if(EMBED){$("#navlinks").style.display="none";document.querySelector(".tagline").style.display="none";}
 
 /* ───────────────────────── palette / easing ───────────────────────── */
-const C={bg:0x0C0A08,gold:0xDDB35A,goldHi:0xF0CF8E,info:0x7EC5DE,ok:0x5BBF92,purple:0xB48BE0,steel:0x9A917F};
+const C={bg:0x0C0A08,gold:0xDDB35A,goldHi:0xF0CF8E,info:0x7EC5DE,ok:0x5BBF92,purple:0xB48BE0,steel:0x9A917F,danger:0xE06B6B};
 const easeInOut=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
 const elastic=t=>t>=1?1:1-Math.pow(2,-10*t)*Math.cos(t*10.5);
 const lerp=(a,b,k)=>a+(b-a)*k;
 
 /* ───────────────────────── renderer / scene ───────────────────────── */
 let renderer;
-try{renderer=new THREE.WebGLRenderer({canvas:$("#scene"),antialias:true});}
+const reducedMotion=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const constrained=innerWidth<760||((navigator.hardwareConcurrency||8)<=4);
+const QUALITY=constrained?"BALANCED":"ULTRA";
+try{renderer=new THREE.WebGLRenderer({canvas:$("#scene"),antialias:true,powerPreference:"high-performance",stencil:false});}
 catch(e){$("#fallback").style.display="grid";throw e;}
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setPixelRatio(Math.min(devicePixelRatio,constrained?1.35:2));
 renderer.outputEncoding=THREE.sRGBEncoding;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=1.12;
+renderer.shadowMap.enabled=!constrained;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(C.bg);
 scene.fog=new THREE.FogExp2(C.bg,0.011);
-const camera=new THREE.PerspectiveCamera(46,1,.1,400);
+const camera=new THREE.PerspectiveCamera(constrained?64:46,1,.1,400);
 
 /* environment map — procedural warm studio, gives PBR reflections */
 {
@@ -188,10 +211,25 @@ const camera=new THREE.PerspectiveCamera(46,1,.1,400);
   scene.environment=cubeRT.texture;
 }
 
-scene.add(new THREE.AmbientLight(0xFFF4E0,.3));
-const key=new THREE.DirectionalLight(0xFFE8C0,1.0);key.position.set(18,32,14);scene.add(key);
+scene.add(new THREE.HemisphereLight(0xE8DCC2,0x100D09,.42));
+scene.add(new THREE.AmbientLight(0xFFF4E0,.18));
+const key=new THREE.DirectionalLight(0xFFE8C0,1.05);key.position.set(18,32,14);key.castShadow=!constrained;
+key.shadow.mapSize.set(constrained?1024:2048,constrained?1024:2048);key.shadow.camera.left=-32;key.shadow.camera.right=32;
+key.shadow.camera.top=32;key.shadow.camera.bottom=-32;key.shadow.camera.near=1;key.shadow.camera.far=90;key.shadow.bias=-.00025;scene.add(key);
 const rimL=new THREE.DirectionalLight(0x7EC5DE,.3);rimL.position.set(-22,14,-18);scene.add(rimL);
 const glowL=new THREE.PointLight(C.gold,1.2,70);glowL.position.set(0,11,0);scene.add(glowL);
+
+/* cinematic post-processing, with direct rendering as the offline/CDN fallback */
+let composer=null,bloomPass=null,fxaaPass=null;
+if(THREE.EffectComposer&&THREE.RenderPass&&THREE.UnrealBloomPass&&THREE.FXAAShader){
+  composer=new THREE.EffectComposer(renderer);
+  composer.addPass(new THREE.RenderPass(scene,camera));
+  bloomPass=new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),constrained?.36:.62,.62,.72);
+  composer.addPass(bloomPass);
+  fxaaPass=new THREE.ShaderPass(THREE.FXAAShader);composer.addPass(fxaaPass);
+}
+$("#qualityLabel").textContent=QUALITY;
+$("#renderStats").textContent=`${composer?"bloom + FXAA":"native AA"} · ${renderer.getPixelRatio().toFixed(1)}×`;
 
 /* ───────────────────────── shared builders ───────────────────────── */
 function roundedBoxGeo(w,h,d,r){
@@ -245,7 +283,7 @@ function makeLabel(title,sub,accent){
   drawLabel(cv,title,sub,accent);
   const t=new THREE.CanvasTexture(cv);t.minFilter=THREE.LinearFilter;
   const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthWrite:false}));
-  s.scale.set(7.4,1.86,1);
+  s.scale.set(constrained?5.5:7.4,constrained?1.38:1.86,1);
   LABELS.push({cv,t,title,sub,accent});
   return s;
 }
@@ -396,6 +434,12 @@ document.fonts.ready.then(()=>{
 
 /* ───────────────────────── stage ───────────────────────── */
 const stage=new THREE.Group();scene.add(stage);
+/* shadow receiver under the holographic floor */
+{
+  const floorShadow=new THREE.Mesh(new THREE.CircleGeometry(31,96),
+    new THREE.MeshStandardMaterial({color:0x100D09,roughness:1,metalness:0,transparent:true,opacity:.62,depthWrite:false}));
+  floorShadow.rotation.x=-Math.PI/2;floorShadow.position.y=-.04;floorShadow.receiveShadow=!constrained;stage.add(floorShadow);
+}
 /* radial gradient floor */
 {
   const c=document.createElement("canvas");c.width=c.height=512;const x=c.getContext("2d");
@@ -427,12 +471,32 @@ tb.computeLineDistances();stage.add(tb);
 const tbWall=new THREE.Mesh(new THREE.CylinderGeometry(13,13,3,120,1,true),
   new THREE.MeshBasicMaterial({color:C.gold,transparent:true,opacity:.028,side:THREE.DoubleSide,depthWrite:false}));
 tbWall.position.y=1.5;stage.add(tbWall);
-/* dust */
+/* low-opacity security dome and a scan ring make the trust boundary spatial */
+const tbDome=new THREE.Mesh(new THREE.SphereGeometry(13,72,32,0,Math.PI*2,0,Math.PI/2),
+  new THREE.MeshBasicMaterial({color:C.gold,wireframe:true,transparent:true,opacity:.032,depthWrite:false}));
+tbDome.scale.y=.58;tbDome.position.y=.03;stage.add(tbDome);
+const boundaryScan=new THREE.Mesh(new THREE.TorusGeometry(12.95,.025,8,160),
+  new THREE.MeshBasicMaterial({color:C.goldHi,transparent:true,opacity:.18,depthWrite:false,blending:THREE.AdditiveBlending}));
+boundaryScan.rotation.x=Math.PI/2;boundaryScan.position.y=.2;stage.add(boundaryScan);
+stage.userData.boundaryScan=boundaryScan;stage.userData.tbDome=tbDome;
+for(let i=0;i<16;i++){
+  const a=i/16*Math.PI*2,beacon=new THREE.Mesh(new THREE.SphereGeometry(.055,10,10),neonMat(C.goldHi,1.8));
+  beacon.position.set(Math.cos(a)*13,.14,Math.sin(a)*13);stage.add(beacon);
+}
+/* deep data field with per-particle system colors */
+let dustField;
 {
-  const n=800,pos=new Float32Array(n*3);
-  for(let i=0;i<n;i++){pos[i*3]=(Math.random()-.5)*170;pos[i*3+1]=Math.random()*54-4;pos[i*3+2]=(Math.random()-.5)*170;}
+  const n=constrained?1100:2800,pos=new Float32Array(n*3),colors=new Float32Array(n*3);
+  const palette=[new THREE.Color(C.goldHi),new THREE.Color(C.info),new THREE.Color(C.ok),new THREE.Color(C.purple)];
+  for(let i=0;i<n;i++){
+    const radius=22+Math.pow(Math.random(),.72)*78,a=Math.random()*Math.PI*2;
+    pos[i*3]=Math.cos(a)*radius+(Math.random()-.5)*8;pos[i*3+1]=Math.random()*48-7;pos[i*3+2]=Math.sin(a)*radius+(Math.random()-.5)*8;
+    const col=palette[Math.floor(Math.random()*palette.length)];colors[i*3]=col.r;colors[i*3+1]=col.g;colors[i*3+2]=col.b;
+  }
   const pg=new THREE.BufferGeometry();pg.setAttribute("position",new THREE.BufferAttribute(pos,3));
-  scene.add(new THREE.Points(pg,new THREE.PointsMaterial({color:0xC9B07A,size:.13,transparent:true,opacity:.45})));
+  pg.setAttribute("color",new THREE.BufferAttribute(colors,3));
+  dustField=new THREE.Points(pg,new THREE.PointsMaterial({size:constrained?.075:.105,vertexColors:true,transparent:true,opacity:.48,
+    sizeAttenuation:true,depthWrite:false,blending:THREE.AdditiveBlending}));scene.add(dustField);
 }
 
 /* ───────────────────────── nodes ───────────────────────── */
@@ -627,6 +691,50 @@ function registerNode(id,group,pickMesh,pos,label,info,hotMats){
     text:"The only component outside the boundary — and it's treated that way. It receives redacted, name-tokenized prompts and returns draft replies and customer summaries, grounded in the retrieved regulation context. If it's down, slow, or keyless, the deterministic template engine takes over mid-flight. It never sees raw PII."},
     [shell.material]);
 }
+/* Identity Vault — Keycloak OIDC and maker-checker authorization */
+{
+  const g=new THREE.Group();
+  const plinth=new THREE.Mesh(new THREE.CylinderGeometry(1.55,1.75,.24,56),metalMat(C.purple,{emissiveIntensity:.12}));
+  plinth.position.y=-1.15;
+  const body=new THREE.Mesh(roundedBoxGeo(1.65,1.25,.55,.18),glassMat(C.purple,{opacity:.95,emissiveIntensity:.2}));
+  body.position.y=-.15;
+  const shackle=new THREE.Mesh(new THREE.TorusGeometry(.62,.12,14,64,Math.PI),neonMat(C.purple,1.45));
+  shackle.position.y=.48;
+  const keyhole=new THREE.Mesh(new THREE.OctahedronGeometry(.18,0),neonMat(C.goldHi,2.2));keyhole.position.set(0,-.12,.34);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(1.45,.025,10,80),neonMat(C.purple,.9));
+  ring.rotation.x=Math.PI/2;ring.position.y=-1.0;
+  const gl=glowSprite(C.purple,3.8,.32);g.add(gl,plinth,body,shackle,keyhole,ring);
+  g.userData.halo=ring;g.userData.lockRing=shackle;
+  registerNode("identity",g,body,new THREE.Vector3(-7.4,2.0,-10.7),
+    makeLabel("Identity Vault","Keycloak · OIDC · maker-checker","#B48BE0"),{
+    title:"Identity Vault",sub:"authentication + approval authority",labelH:2.35,
+    tags:["OIDC + PKCE","operator / supervisor roles","API-key break glass"],
+    code:["OidcAuth.java","ApiKeyFilter.java","keycloak-realm.json"],
+    text:"Keycloak establishes the real operator identity and role before any privileged case action. Ordinary operators can work the queue; critical and escalated cases require a supervisor, and refused approvals are audited. The shared API key remains a constant-time compared development and break-glass path, not the production identity model."},
+    [body.material,shackle.material,keyhole.material,ring.material]);
+}
+/* Audit Observatory — immutable evidence plus product intelligence */
+{
+  const g=new THREE.Group();
+  const core=new THREE.Mesh(new THREE.OctahedronGeometry(.82,1),glassMat(C.ok,{opacity:.9,emissiveIntensity:.34,roughness:.08}));
+  core.position.y=.6;
+  const spine=new THREE.Mesh(new THREE.CylinderGeometry(.24,.38,2.5,32),metalMat(C.gold,{emissiveIntensity:.18}));
+  spine.position.y=-.15;
+  const rings=[];
+  for(let i=0;i<3;i++){
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(1.05+i*.28,.035,10,80),neonMat(i===1?C.info:C.ok,.9));
+    ring.rotation.x=Math.PI/2.25+i*.24;ring.rotation.y=i*.75;ring.position.y=-.55+i*.55;g.add(ring);rings.push(ring);
+  }
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(1.75,1.95,.22,64),metalMat(C.ok,{emissiveIntensity:.1}));base.position.y=-1.48;
+  const gl=glowSprite(C.ok,4.3,.3);g.add(gl,core,spine,base);g.userData.auditRings=rings;g.userData.crystal=core;
+  registerNode("audit",g,core,new THREE.Vector3(3.5,2.15,11.8),
+    makeLabel("Audit Observatory","immutable evidence · insights · learning loop","#5BBF92"),{
+    title:"Audit Observatory",sub:"accountability and operational intelligence",labelH:2.8,
+    tags:["append-only events","SLA watchlist","draft edit similarity","training export"],
+    code:["AuditService.java","InsightsController.java","EditSignal.java"],
+    text:"Every material decision lands here: classifications, risk flags, retrieved passages, draft source, verification issues, approvals, overrides, sends and follow-ups. The same evidence drives the SLA watchlist, risk trends, repeat-customer signals and the learning loop that measures how much operators changed each AI draft."},
+    rings.map(r=>r.material).concat([core.material]));
+}
 
 /* Rate-Limit Ledger — Redis: a small stacked ledger with a spinning counter ring */
 {
@@ -686,6 +794,13 @@ function registerNode(id,group,pickMesh,pos,label,info,hotMats){
 }
 
 /* ───────────────────────── flows ───────────────────────── */
+/* PBR objects participate in the Ultra shadow pass; screen planes and glow sprites stay unlit. */
+if(!constrained)scene.traverse(o=>{
+  if(!o.isMesh)return;
+  const mats=Array.isArray(o.material)?o.material:[o.material];
+  const lit=mats.some(m=>m&&(m.isMeshStandardMaterial||m.isMeshPhysicalMaterial));
+  if(lit){o.castShadow=true;o.receiveShadow=true;}
+});
 function curveBetween(a,b,lift=3.2){
   const A=nodes[a].group.position.clone(),B=nodes[b].group.position.clone();
   const mid=A.clone().lerp(B,.5);mid.y=Math.max(A.y,B.y)+lift;
@@ -708,6 +823,11 @@ const FLOWS={
   toRedis:{c:curveBetween("api","redis",2.2),col:C.steel},
   toRelay:{c:curveBetween("api","relay",2.8),col:C.gold},
   relayToInbox:{c:curveBetween("relay","mailClient",4.8),col:C.ok},
+  auth:{c:curveBetween("console","identity",3.5),col:C.purple},
+  authToApi:{c:curveBetween("identity","api",3.9),col:C.purple},
+  toAudit:{c:curveBetween("api","audit",3.3),col:C.ok},
+  auditToDb:{c:curveBetween("audit","db",3.1),col:C.ok},
+  auditInsights:{c:curveBetween("audit","console",5.7),col:C.info},
 };
 for(const f of Object.values(FLOWS)){
   const tube=new THREE.Mesh(new THREE.TubeGeometry(f.c,54,.032,8,false),
@@ -746,9 +866,9 @@ const PHASES=[
   {n:"03",label:"Compliance",tip:"regulatory clocks + risk flags computed",act:()=>towerFlash(),d:1600},
   {n:"04",label:"Retrieve",tip:"pgvector finds the governing regulation passages",act:()=>{firePulse("toDb",850);setTimeout(()=>firePulse("fromDb",850),900);},d:2000},
   {n:"05",label:"Redact + Draft",tip:"PII stripped, then the external LLM drafts",act:()=>{firePulse("toGate",800);setTimeout(()=>firePulse("gateToNim",1000),850);setTimeout(()=>firePulse("nimToApi",1200),1900);},d:3400},
-  {n:"06",label:"Verify",tip:"every figure grounded against the complaint",act:()=>gateFlash(),d:1500},
-  {n:"07",label:"Human review",tip:"an operator reads, edits, approves",act:()=>firePulse("toConsole",1300),d:1750},
-  {n:"08",label:"Respond",tip:"approved reply pushed live to the portal over SSE — no polling",act:()=>{firePulse("approve",1000);setTimeout(()=>firePulse("respond",1400),1050);},d:2950},
+  {n:"06",label:"Verify",tip:"every figure grounded against the complaint and recorded",act:()=>{gateFlash();setTimeout(()=>firePulse("toAudit",950),350);},d:1650},
+  {n:"07",label:"Human review",tip:"an authenticated operator reads, edits and approves",act:()=>{firePulse("auth",800);setTimeout(()=>firePulse("authToApi",800),750);setTimeout(()=>firePulse("toConsole",1300),1350);},d:2950},
+  {n:"08",label:"Respond",tip:"approved reply pushed live and the decision is persisted",act:()=>{firePulse("approve",1000);setTimeout(()=>firePulse("respond",1400),1050);setTimeout(()=>firePulse("auditToDb",900),1250);setTimeout(()=>firePulse("auditInsights",1250),1750);},d:3300},
   {n:"09",label:"Notify",tip:"branded email delivered to the customer's inbox",act:()=>{firePulse("toRelay",850);setTimeout(()=>firePulse("relayToInbox",1300),900);},d:2600},
 ];
 const rail=$("#rail");
@@ -783,10 +903,12 @@ function gateFlash(){
 }
 
 /* ───────────────────────── camera ───────────────────────── */
-const target=new THREE.Vector3(0,2.4,0),parallax=new THREE.Vector3();
-let theta=-.85,phi=1.1,radius=95,radiusGoal=36,lastInteract=0,dragging=false,px=0,py=0;
+const target=new THREE.Vector3(0,2.4,0),targetGoal=target.clone(),homeTarget=target.clone(),parallax=new THREE.Vector3();
+const HOME_RADIUS=constrained?62:44;
+let theta=-.85,phi=1.1,radius=95,radiusGoal=HOME_RADIUS,lastInteract=0,dragging=false,px=0,py=0;
 const introStart=performance.now();
 function applyCam(now){
+  target.lerp(targetGoal,.055);
   const intro=Math.min(1,(now-introStart)/2400);
   const ei=1-Math.pow(1-intro,3);
   const r=lerp(95,radius,ei),ph=lerp(.55,phi,ei);
@@ -806,7 +928,7 @@ addEventListener("pointermove",e=>{
 addEventListener("pointerup",()=>{dragging=false;cv.classList.remove("dragging");});
 cv.addEventListener("wheel",e=>{e.preventDefault();radiusGoal=Math.max(14,Math.min(90,radiusGoal+e.deltaY*.03));
   lastInteract=performance.now();},{passive:false});
-cv.addEventListener("dblclick",()=>{theta=-.85;phi=1.1;radiusGoal=36;});
+cv.addEventListener("dblclick",()=>{theta=-.85;phi=1.1;radiusGoal=HOME_RADIUS;targetGoal.copy(homeTarget);});
 
 /* ───────────────────────── picking ───────────────────────── */
 const ray=new THREE.Raycaster(),mouse=new THREE.Vector2(),tip=$("#tip"),panel=$("#panel");
@@ -821,6 +943,7 @@ cv.addEventListener("click",()=>{
   if(performance.now()-clickArm>250)return;
   if(hovered){
     const inf=nodes[hovered].info;
+    targetGoal.copy(nodes[hovered].group.position);targetGoal.y+=.35;radiusGoal=Math.max(15,Math.min(radiusGoal,20));
     $("#panelBody").innerHTML=`<div class="sub">${inf.sub}</div><h2>${inf.title}</h2>
       <div>${inf.tags.map(t=>`<span class="tag">${t}</span>`).join("")}</div>
       <p>${inf.text}</p>
@@ -828,6 +951,7 @@ cv.addEventListener("click",()=>{
     panel.style.display="block";
   }
 });
+addEventListener("keydown",e=>{if(e.key==="Escape"){panel.style.display="none";targetGoal.copy(homeTarget);radiusGoal=HOME_RADIUS;}});
 function pick(){
   if(!mouseMoved||dragging)return;
   ray.setFromCamera(mouse,camera);
@@ -856,7 +980,11 @@ function pick(){
 })();
 
 /* ───────────────────────── main loop ───────────────────────── */
-function resize(){renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();}
+function resize(){
+  renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  if(composer)composer.setSize(innerWidth,innerHeight);
+  if(fxaaPass){const pr=renderer.getPixelRatio();fxaaPass.material.uniforms.resolution.value.set(1/(innerWidth*pr),1/(innerHeight*pr));}
+}
 addEventListener("resize",resize);resize();
 
 let running=true;
@@ -867,6 +995,14 @@ function loop(now){
   radius+=(radiusGoal-radius)*.06;
   if(!dragging&&now-lastInteract>4500)theta+=.0011;
   applyCam(now);
+
+  if(dustField&&!reducedMotion)dustField.rotation.y=now*.000008;
+  if(stage.userData.boundaryScan){
+    const scan=stage.userData.boundaryScan;scan.position.y=.25+(Math.sin(now*.00042)+1)*3.45;
+    scan.scale.setScalar(.98+Math.sin(now*.0011)*.018);
+    scan.material.opacity=.1+(Math.sin(now*.0011)+1)*.065;
+  }
+  if(stage.userData.tbDome)stage.userData.tbDome.rotation.y=now*.000025;
 
   for(const id in nodes){
     const n=nodes[id];
@@ -889,15 +1025,24 @@ function loop(now){
     if(u.electrons){u.electrons.children.forEach((e,i)=>{
       const a=now*.0016+i*2.1;e.position.set(Math.cos(a)*1.55,Math.sin(a*1.3)*.5,Math.sin(a)*1.55);});}
     if(u.ringA){u.ringA.rotation.x=now*.0008;u.ringB.rotation.y=now*.001;u.core.rotation.y=now*.0013;}
+    if(u.lockRing)u.lockRing.rotation.z=Math.sin(now*.0008)*.08;
+    if(u.auditRings)u.auditRings.forEach((r,i)=>{r.rotation.z=now*(i%2?.00055:-.00045);r.rotation.y+=.001*(i+1);});
+    if(u.crystal)u.crystal.rotation.y=now*.0008;
   }
   tb.rotation.y=now*.00005;
   stepPulses(now);
   pick();
-  renderer.render(scene,camera);
+  composer?composer.render():renderer.render(scene,camera);
 }
 requestAnimationFrame(loop);
 setTimeout(nextPhase,2100);
 setTimeout(()=>{const h=$("#hint");if(h)h.style.opacity=0;},9000);
+$("#renderStats").textContent=`${composer?"bloom + FXAA":"native AA"} · ${renderer.getPixelRatio().toFixed(1)}× · ${Object.keys(nodes).length} nodes`;
+window.__AEGIS_VISUAL_DIAGNOSTICS__=()=>({
+  quality:QUALITY,postProcessing:Boolean(composer),pixelRatio:renderer.getPixelRatio(),nodes:Object.keys(nodes).length,
+  flows:Object.keys(FLOWS).length,particles:dustField?.geometry?.attributes?.position?.count||0,
+  drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,webgl2:renderer.capabilities.isWebGL2
+});
 </script>
 </body>
 </html>
