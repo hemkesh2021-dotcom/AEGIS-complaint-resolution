@@ -45,4 +45,20 @@ public class PiiRedactor {
         t = ACCOUNT.matcher(t).replaceAll("[account number removed]");
         return t;
     }
+    /** Mask the supplied full name as well as supported identifier patterns.
+     * This does not discover other people's names or free-form addresses.
+     */
+    public String redact(String text, String customerName) {
+        if (text == null) return null;
+        String safe = text;
+        if (customerName != null && !customerName.isBlank()
+                && !"Customer".equalsIgnoreCase(customerName.trim())) {
+            safe = Pattern.compile(Pattern.quote(customerName.trim()),
+                    Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE)
+                    .matcher(safe).replaceAll("{CUSTOMER_NAME}");
+        }
+        return redact(safe);
+    }
+
 }
+
