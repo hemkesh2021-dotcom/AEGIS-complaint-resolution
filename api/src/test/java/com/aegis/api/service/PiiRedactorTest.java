@@ -44,6 +44,8 @@ class PiiRedactorTest {
         assertEquals("ನಾನು {CUSTOMER_NAME}", redactor.redact("ನಾನು ಹೇಮಕೇಶ್", "ಹೇಮಕೇಶ್"));
         assertEquals("{CUSTOMER_NAME} wrote", redactor.redact("Zoë wrote", "ZOË"));
         assertNull(redactor.redact(null, "A. Rao"));
+        assertEquals("{CUSTOMER_NAME} disputes an annual fee",
+                redactor.redact("Ann disputes an annual fee", "Ann"));
     }
 
 }

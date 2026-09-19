@@ -53,7 +53,8 @@ public class PiiRedactor {
         String safe = text;
         if (customerName != null && !customerName.isBlank()
                 && !"Customer".equalsIgnoreCase(customerName.trim())) {
-            safe = Pattern.compile(Pattern.quote(customerName.trim()),
+            safe = Pattern.compile("(?<![\\p{L}\\p{N}\\p{M}])" + Pattern.quote(customerName.trim())
+                    + "(?![\\p{L}\\p{N}\\p{M}])",
                     Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE)
                     .matcher(safe).replaceAll("{CUSTOMER_NAME}");
         }
