@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-/** Nothing personally identifying may cross the trust boundary to the external LLM. */
+/** Regression tests for supported redaction patterns, not a complete PII guarantee. */
 class PiiRedactorTest {
 
     private final PiiRedactor redactor = new PiiRedactor();
@@ -37,4 +37,16 @@ class PiiRedactorTest {
         assertNull(redactor.redact(null));
         assertEquals("", redactor.redact(""));
     }
+    @Test
+    void masksDeclaredNamesIncludingUnicodeAndRegexCharacters() {
+        assertEquals("I am {CUSTOMER_NAME}; refund $420.",
+                redactor.redact("I am A. Rao; refund $420.", "a. rao"));
+        assertEquals("ನಾನು {CUSTOMER_NAME}", redactor.redact("ನಾನು ಹೇಮಕೇಶ್", "ಹೇಮಕೇಶ್"));
+        assertEquals("{CUSTOMER_NAME} wrote", redactor.redact("Zoë wrote", "ZOË"));
+        assertNull(redactor.redact(null, "A. Rao"));
+        assertEquals("{CUSTOMER_NAME} disputes an annual fee",
+                redactor.redact("Ann disputes an annual fee", "Ann"));
+    }
+
 }
+

@@ -99,7 +99,7 @@ public class DraftService {
                 String reply = ChatClient.create(chatModel)
                         .prompt()
                         .system(SYSTEM_PROMPT + langRule)
-                        .user(buildPrompt(complaintId, category, summary, compliance, context))
+                        .user(redactor.redact(buildPrompt(complaintId, category, summary, compliance, context), customerName))
                         .call()
                         .content();
                 if (reply != null && !reply.isBlank()) {
@@ -244,3 +244,4 @@ public class DraftService {
         return out;
     }
 }
+
