@@ -61,7 +61,7 @@ public class PipelineService {
         LanguageService.Detection lang = language.detect(req.text());
         String working = req.text();
         if (!"en".equals(lang.code())) {
-            String translated = language.translateToEnglish(req.text(), lang);
+            String translated = language.translateToEnglish(req.text(), lang, req.customerName());
             if (translated != null) {
                 working = translated;
             }
@@ -129,3 +129,4 @@ public class PipelineService {
         return s == null || s.isBlank();
     }
 }
+

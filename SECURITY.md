@@ -39,10 +39,21 @@ Every AI-drafted reply passes a **grounding check** at draft time and again at s
 
 ## Data protection (PII)
 
-- **Trust boundary:** classification and embeddings run locally. Only drafting/summarization
-  calls an external LLM, and those prompts are **redacted first** — emails, phone numbers,
-  card/account numbers, and SSN-like ids are stripped, and the customer's name is replaced by a
-  `{CUSTOMER_NAME}` token that is substituted back locally after generation.
+- **Trust boundary:** classification and embeddings run locally. Translation, drafting,
+  and summarization can call an external LLM. Before those calls, best-effort redaction
+  masks supported email, phone, card/account and SSN-like patterns and the supplied full
+  customer name. Drafting and summarization restore `{CUSTOMER_NAME}` locally; translation
+  retains the token for downstream processing. Calls without a supplied name can only
+  redact identifier patterns.
+- **Name matching:** literal, case-insensitive Unicode matching uses letter/number/mark
+  boundaries at non-Han name edges to avoid replacing substrings of unrelated words.
+  Han edges do not require word boundaries because Chinese prose normally has no spaces
+  around names. Exact supplied Han names are masked even within longer phrases; this
+  deliberately favors privacy over possible over-redaction, not linguistic segmentation.
+- **Limits:** this is not comprehensive anonymization. Unknown or partial names, spelling
+  and normalization variants, other unsegmented scripts, addresses, contextual identifiers,
+  and unsupported identifier formats may remain. Validate de-identification and provider
+  data-handling controls before enabling external AI for real customer data.
 - **Status lookups** use a 128-bit random tracking token (`TRK-…`), not the short CMP reference —
   references are never accepted on the public status endpoint, so cases can't be enumerated.
 - **Retention:** a daily purge job deletes cases + audit events older than
@@ -56,3 +67,4 @@ This is a portfolio/reference project. Before any production use:
 - Terminate **TLS/HTTPS** and put the API behind a WAF.
 - Move all secrets (NIM key, DB credentials) into a secret manager; rotate them.
 - Do **not** process real customer PII without appropriate legal and privacy controls. The bundled regulation knowledge base is illustrative and is **not** legal advice.
+

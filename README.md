@@ -12,7 +12,7 @@ A **Spring Boot** (Java 21) orchestrator chains seven phases — ingest → clas
 ## Why it's different
 
 - **Grounding gate.** Every AI draft is verified twice — at draft time and again at the moment of approval. Amounts, dates, and phone numbers must appear in the complaint or retrieved context; template debris (`[Bank Name]`, raw timestamps) is caught. A reply citing $150 against a $420 complaint is blocked with a 422; operator overrides are possible but audit-trailed. This caught a real hallucination during development — there's a regression test reproducing it.
-- **PII never crosses the trust boundary.** Prompts to the external LLM are redacted (emails, phones, card/account numbers, SSNs) and the customer's name travels as a `{CUSTOMER_NAME}` token substituted back locally. Classification and embeddings run fully local. A daily job purges expired data (`AEGIS_RETENTION_DAYS`).
+- **Best-effort PII minimization.** Prompts to the external LLM are redacted (emails, phones, card/account numbers, SSNs) and occurrences of the supplied full customer name are replaced with a `{CUSTOMER_NAME}` token substituted back locally. Classification and embeddings run fully local. A daily job purges expired data (`AEGIS_RETENTION_DAYS`).
 - **Unguessable tracking.** Customers track cases with a 128-bit `TRK-…` token; short CMP references are never accepted on public endpoints, so cases can't be enumerated. Both public endpoints are per-IP rate-limited.
 - **Immutable communications.** Sent replies can't be edited — corrections go out as follow-up messages the customer sees as a thread, each one re-verified and audited.
 - **Hybrid, citation-pinned retrieval.** Semantic search (pgvector) fused with keyword BM25 via reciprocal-rank fusion — embeddings catch paraphrase, BM25 catches exact regulatory vocabulary. Every case stores the exact passages that grounded its draft, and the operator sees them as "Grounding sources" before approving. If pgvector is down, retrieval degrades to keyword-only instead of failing.
@@ -151,7 +151,7 @@ Defense in depth, documented in full in [SECURITY.md](SECURITY.md):
 - **Auth:** operator endpoints accept **OIDC bearer tokens** (Keycloak SSO — real identities, `operator`/`supervisor` roles, PKCE login in the console) or the `X-API-Key` break-glass/dev key (constant-time compare); only intake, status, and health are public. Every approval and follow-up records **who** did it.
 - **Maker-checker:** CRITICAL and escalated cases can only be approved by a `supervisor` — an operator's attempt is refused with 403 and the refusal itself is audit-trailed. Console logins: `operator1/operator`, `supervisor1/supervisor` (Keycloak admin at http://localhost:8089, admin/admin).
 - **AI-output safety:** the grounding gate blocks invented figures, contacts, and template debris at draft *and* send time; overrides are audited.
-- **Data protection:** PII redaction + name tokenization before any external LLM call; 128-bit tracking tokens; retention purge job.
+- **Data protection:** PII redaction + name tokenization on supported external LLM paths; 128-bit tracking tokens; retention purge job.
 - **Abuse resistance:** per-IP rate limits on intake (LLM-cost abuse) and status (token guessing), **Redis-backed** so they hold across replicas (in-memory fallback, never fails open); `X-Forwarded-For` honored only behind a trusted proxy (`AEGIS_TRUST_PROXY`); 8 KB input cap; suppressed stack traces; non-root containers.
 - **Supply chain:** gitleaks secret-scanning in CI (full history); Dependabot across Maven, pip, Actions, and Dockerfiles.
 
@@ -182,3 +182,8 @@ Contributions are welcome — please read [CONTRIBUTING.md](CONTRIBUTING.md) and
 Released under the [MIT License](LICENSE) © 2026 Hemkesh.
 
 > **Disclaimer:** an educational / portfolio project — not legal or financial advice. The bundled regulation knowledge base is illustrative only. Do not process real customer PII without appropriate privacy and security controls.
+
+
+## Privacy boundary and remaining limitations
+
+Regex redaction is not a guarantee that all personal information is removed. Drafting and translation mask the supplied full customer name and supported email, phone, card/account and SSN patterns. Other names, partial names, addresses, unusual identifier formats and contextual identifying details may remain. The name token is restored locally in draft replies. Use synthetic complaints for demos; deployment with real personal data requires a separately validated de-identification policy and appropriate external-model controls. Tests establish behavior for specific examples, not universal privacy protection.

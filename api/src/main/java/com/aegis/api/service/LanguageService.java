@@ -119,6 +119,10 @@ public class LanguageService {
 
     /** Translate a complaint to English for the pipeline (redacted first; fail-soft). */
     public String translateToEnglish(String text, Detection from) {
+        return translateToEnglish(text, from, null);
+    }
+
+    public String translateToEnglish(String text, Detection from, String customerName) {
         ChatModel model = chatModelProvider.getIfAvailable();
         if (model == null || text == null || text.isBlank()) {
             return null;
@@ -129,7 +133,7 @@ public class LanguageService {
                     .system("You are a precise translator. Translate the user's text from "
                             + from.name() + " to English. Preserve all amounts, dates, and reference "
                             + "numbers exactly. Output ONLY the translation — no preamble, no notes.")
-                    .user(redactor.redact(text))
+                    .user(redactor.redact(text, customerName))
                     .call()
                     .content();
             return out == null || out.isBlank() ? null : out.strip();
@@ -144,3 +148,4 @@ public class LanguageService {
         return Set.of(s.split(" "));
     }
 }
+
