@@ -25,16 +25,16 @@ import org.springframework.stereotype.Service;
  * retrieved regulation context (RAG). On any failure — no key, timeout, error —
  * fall back to the deterministic template engine, so the pipeline never breaks.
  *
- * <p>Privacy: the customer's name never leaves the trust boundary — prompts use a
- * {@code {CUSTOMER_NAME}} token that is substituted locally after generation, and
- * complaint text is passed through {@link PiiRedactor} before any external call.
+ * <p>Privacy: prompts use a {@code {CUSTOMER_NAME}} token that is substituted
+ * locally after generation. Name-aware {@link PiiRedactor} filtering is best-effort,
+ * not a guarantee that free-form text contains no identifying information.
  */
 @Service
 public class DraftService {
 
     private static final Logger log = LoggerFactory.getLogger(DraftService.class);
 
-    /** Local-substitution token so real names are never sent to the external LLM. */
+    /** Local-substitution token for the supplied customer name. */
     static final String NAME_TOKEN = "{CUSTOMER_NAME}";
 
     private static final DateTimeFormatter ISO_MIN = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
@@ -103,7 +103,7 @@ public class DraftService {
                         .call()
                         .content();
                 if (reply != null && !reply.isBlank()) {
-                    // substitute the real name locally — it was never sent to the LLM
+                    // substitute the supplied name locally after generation
                     reply = reply.replace(NAME_TOKEN, customerName);
                     return new Draft(extractSubject(reply, complaintId), cleanReply(reply), "NVIDIA NIM (RAG)");
                 }
@@ -184,11 +184,7 @@ public class DraftService {
             return "";
         }
         // Privacy: tokenize the name and redact identifiers before the external call.
-        String safe = reply;
-        if (customerName != null && !customerName.isBlank()) {
-            safe = safe.replace(customerName, NAME_TOKEN);
-        }
-        safe = redactor.redact(safe);
+        String safe = redactor.redact(reply, customerName);
 
         ChatModel chatModel = chatModelProvider.getIfAvailable();
         if (chatModel != null) {
@@ -244,4 +240,5 @@ public class DraftService {
         return out;
     }
 }
+
 

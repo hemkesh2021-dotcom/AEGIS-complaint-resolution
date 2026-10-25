@@ -48,5 +48,37 @@ class PiiRedactorTest {
                 redactor.redact("Ann disputes an annual fee", "Ann"));
     }
 
+    @Test
+    void masksHanNamesWithoutWhitespaceIncludingSupplementaryCodePoints() {
+        assertEquals("我是{CUSTOMER_NAME}，我要投诉银行。",
+                redactor.redact("我是张伟，我要投诉银行。", "张伟"));
+        assertEquals("{CUSTOMER_NAME}和{CUSTOMER_NAME}",
+                redactor.redact("张伟和张伟", "张伟"));
+        assertEquals("我是{CUSTOMER_NAME}。", redactor.redact("我是𠀀伟。", "𠀀伟"));
+        // Privacy-first: a longer Han name/phrase is intentionally over-redacted.
+        assertEquals("{CUSTOMER_NAME}明", redactor.redact("张伟明", "张伟"));
+    }
+
+    @Test
+    void preservesNonHanSubstringsAndCombiningMarkBoundaries() {
+        assertEquals("Joanne annual Ann2 2Ann Ann\u0301 {CUSTOMER_NAME}",
+                redactor.redact("Joanne annual Ann2 2Ann Ann\u0301 ANN", "Ann"));
+        assertEquals("Ax Rao and {CUSTOMER_NAME}",
+                redactor.redact("Ax Rao and A. RAO", " A. Rao "));
+        assertEquals("ಹೇಮಕೇಶ್‌", redactor.redact("ಹೇಮಕೇಶ್‌", "ಅಮಿತ್"));
+        assertEquals("Zoëlla {CUSTOMER_NAME}", redactor.redact("Zoëlla ZOË", "Zoë"));
+    }
+
+    @Test
+    void handlesMissingNamesAndKeepsExistingTokensStable() {
+        assertEquals("Customer Ann", redactor.redact("Customer Ann", "Customer"));
+        assertEquals("Ann", redactor.redact("Ann", "  "));
+        assertEquals("Ann", redactor.redact("Ann", null));
+        assertEquals("{CUSTOMER_NAME}", redactor.redact("{CUSTOMER_NAME}", "张伟"));
+        assertEquals("{CUSTOMER_NAME}", redactor.redact("{CUSTOMER_NAME}", "Ann"));
+        assertEquals("[email removed]", redactor.redact("x@example.test", null));
+    }
+
 }
+
 
