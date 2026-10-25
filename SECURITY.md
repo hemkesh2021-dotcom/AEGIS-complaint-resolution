@@ -37,6 +37,19 @@ Every AI-drafted reply passes a **grounding check** at draft time and again at s
 - Template debris — `[Bank Name]`-style placeholders, unfilled `{tokens}`, raw ISO
   timestamps — also blocks the send.
 
+## Complaint creation boundary
+
+- Public `/api/intake` always issues a new server-generated case reference; any
+  supplied `complaintId` is ignored. Generated references use a full UUID.
+- Authenticated `/api/complaints` may supply a new reference for integration use.
+  An existing reference is a conflict (HTTP 409), never an update or lookup.
+- All creation paths use an insert-only database operation. Primary-key uniqueness
+  arbitrates concurrent duplicate references; a failed creation rolls back its
+  audit work and cannot replace an existing reply, tracking token, or customer data.
+- Retrying public intake creates another complaint, not an idempotent replay.
+  Use the returned tracking token for status; creation never returns an existing
+  complaint's token based on a caller-selected reference.
+
 ## Approval and notification boundaries
 
 - Initial replies and follow-ups both require a supervisor for CRITICAL or escalated
