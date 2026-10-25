@@ -10,12 +10,15 @@ import com.aegis.api.repo.AuditEventRepository;
 import com.aegis.api.repo.CaseMessageRepository;
 import com.aegis.api.repo.CaseRepository;
 import com.aegis.api.service.CaseEventsPublisher;
+import com.aegis.api.service.ApprovalTransactions;
+import com.aegis.api.service.AfterCommitDelivery;
 import com.aegis.api.service.DraftService;
 import com.aegis.api.service.DraftVerifier;
 import com.aegis.api.service.EmailService;
 import com.aegis.api.service.RagRetriever;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -43,11 +46,14 @@ public class AuditController {
     private final RagRetriever retriever;
     private final EmailService email;
     private final CaseEventsPublisher caseEvents;
+    private final ApprovalTransactions transactions;
+    private final AfterCommitDelivery delivery;
 
     public AuditController(CaseRepository cases, AuditEventRepository events,
                            CaseMessageRepository messages, DraftService drafting,
                            DraftVerifier verifier, RagRetriever retriever,
-                           EmailService email, CaseEventsPublisher caseEvents) {
+                           EmailService email, CaseEventsPublisher caseEvents,
+                           ApprovalTransactions transactions, AfterCommitDelivery delivery) {
         this.cases = cases;
         this.events = events;
         this.messages = messages;
@@ -56,6 +62,8 @@ public class AuditController {
         this.retriever = retriever;
         this.email = email;
         this.caseEvents = caseEvents;
+        this.transactions = transactions;
+        this.delivery = delivery;
     }
 
     /** One case + its ordered audit trail + follow-up thread. */
@@ -96,60 +104,64 @@ public class AuditController {
                                           @RequestBody(required = false) ApproveRequest req,
                                           HttpServletRequest http) {
         String actor = actor(http);
-        return cases.findById(id).<ResponseEntity<Object>>map(c -> {
-            // Sent communications are immutable — the customer has already seen them.
-            // Corrections and updates go through POST /complaints/{id}/follow-up.
-            if ("SENT".equals(c.getStatus())) {
-                return ResponseEntity.status(409).body((Object) Map.of(
-                        "error", "this reply was already sent and is immutable — send a follow-up instead"));
-            }
+        return cases.findById(id).<ResponseEntity<Object>>map(snapshot -> {
+            // Network-backed preparation happens before the short locked transaction.
+            // Unauthorized/already-sent requests do not invoke retrieval or summarization.
+            boolean prepare = !"SENT".equals(snapshot.getStatus())
+                    && (!highStakes(snapshot) || hasRole(http, ApiKeyFilter.ROLE_SUPERVISOR));
+            String context = prepare ? retrievedContext(snapshot.getComplaintText()) : "";
+            String preparedBody = req != null && req.body() != null && !req.body().isBlank()
+                    ? req.body() : snapshot.getDraftBody();
+            String summary = prepare ? drafting.summarize(preparedBody, snapshot.getCustomerName()) : "";
+            return transactions.withLockedCase(id, c -> {
+                // Sent communications are immutable — the customer has already seen them.
+                // Corrections and updates go through POST /complaints/{id}/follow-up.
+                if ("SENT".equals(c.getStatus())) {
+                    return ResponseEntity.status(409).body((Object) Map.of(
+                            "error", "this reply was already sent and is immutable — send a follow-up instead"));
+                }
 
-            // Maker-checker: CRITICAL or escalated cases need a supervisor's sign-off.
-            boolean highStakes = "CRITICAL".equals(c.getUrgency()) || c.isEscalate();
-            if (highStakes && !hasRole(http, ApiKeyFilter.ROLE_SUPERVISOR)) {
-                events.save(new AuditEvent(id, "maker-checker",
-                        "approval by '" + actor + "' REFUSED — CRITICAL/escalated cases require the supervisor role"));
-                return ResponseEntity.status(403).body((Object) Map.of(
-                        "error", "maker-checker: CRITICAL and escalated cases require a supervisor to approve",
-                        "requiredRole", ApiKeyFilter.ROLE_SUPERVISOR));
-            }
-            String subject = (req != null && req.subject() != null && !req.subject().isBlank())
-                    ? req.subject() : c.getDraftSubject();
-            String body = (req != null && req.body() != null && !req.body().isBlank())
-                    ? req.body() : c.getDraftBody();
+                ResponseEntity<Object> denied = requireSupervisor(c, http, actor);
+                if (denied != null) return denied;
+                if (!sameApprovalInputs(snapshot, c)) return changedCase();
+                String subject = (req != null && req.subject() != null && !req.subject().isBlank())
+                        ? req.subject() : c.getDraftSubject();
+                String body = (req != null && req.body() != null && !req.body().isBlank())
+                        ? req.body() : c.getDraftBody();
 
-            // Send gate — nothing with invented figures or template debris goes out.
-            List<String> issues = verifier.verify(subject, body,
-                    c.getComplaintText(), retrievedContext(c.getComplaintText()),
-                    c.getClause(), c.getAckDue(), c.getResolutionDue());
-            boolean force = req != null && Boolean.TRUE.equals(req.force());
-            if (!issues.isEmpty() && !force) {
-                events.save(new AuditEvent(id, "verification",
-                        "send BLOCKED by grounding check: " + String.join(" | ", issues)));
-                return ResponseEntity.unprocessableEntity()
-                        .body((Object) Map.of("error", "draft failed the grounding check", "issues", issues));
-            }
+                // Send gate — nothing with invented figures or template debris goes out.
+                List<String> issues = verifier.verify(subject, body,
+                        c.getComplaintText(), context,
+                        c.getClause(), c.getAckDue(), c.getResolutionDue());
+                boolean force = req != null && Boolean.TRUE.equals(req.force());
+                if (!issues.isEmpty() && !force) {
+                    events.save(new AuditEvent(id, "verification",
+                            "send BLOCKED by grounding check: " + String.join(" | ", issues)));
+                    return ResponseEntity.unprocessableEntity()
+                            .body((Object) Map.of("error", "draft failed the grounding check", "issues", issues));
+                }
 
-            c.setFinalSubject(subject);
-            c.setFinalBody(body);
-            c.setFinalSummary(drafting.summarize(body, c.getCustomerName()));
-            c.setStatus("SENT");
-            // Learning loop — every approval is implicit feedback on the AI draft.
-            boolean edited = !nzs(body).equals(nzs(c.getDraftBody()))
-                    || !nzs(subject).equals(nzs(c.getDraftSubject()));
-            double sim = edited ? com.aegis.api.service.EditSignal.similarity(c.getDraftBody(), body) : 1.0;
-            c.setOperatorEdited(edited);
-            c.setEditSimilarity(sim);
-            cases.save(c);
-            events.save(new AuditEvent(id, "learning", edited
-                    ? String.format("operator edited the draft before sending (similarity %.2f) — captured for retraining", sim)
-                    : "draft sent unedited — positive training signal"));
-            events.save(new AuditEvent(id, "approved", "by '" + actor + "' — " + (issues.isEmpty()
-                    ? "reviewed, approved, and sent the reply"
-                    : "sent with OVERRIDE despite grounding issues: " + String.join(" | ", issues))));
-            email.sendResponse(c);                            // real delivery, audited
-            caseEvents.publish(c.getTrackingToken(), "update"); // push to any open portal page
-            return ResponseEntity.ok((Object) c);
+                c.setFinalSubject(subject);
+                c.setFinalBody(body);
+                c.setFinalSummary(summary);
+                c.setStatus("SENT");
+                // Learning loop — every approval is implicit feedback on the AI draft.
+                boolean edited = !nzs(body).equals(nzs(c.getDraftBody()))
+                        || !nzs(subject).equals(nzs(c.getDraftSubject()));
+                double sim = edited ? com.aegis.api.service.EditSignal.similarity(c.getDraftBody(), body) : 1.0;
+                c.setOperatorEdited(edited);
+                c.setEditSimilarity(sim);
+                cases.save(c);
+                events.save(new AuditEvent(id, "learning", edited
+                        ? String.format("operator edited the draft before sending (similarity %.2f) — captured for retraining", sim)
+                        : "draft sent unedited — positive training signal"));
+                events.save(new AuditEvent(id, "approved", "by '" + actor + "' — " + (issues.isEmpty()
+                        ? "reviewed, approved, and sent the reply"
+                        : "sent with OVERRIDE despite grounding issues: " + String.join(" | ", issues))));
+                delivery.schedule(() -> email.sendResponse(c));
+                delivery.schedule(() -> caseEvents.publish(c.getTrackingToken(), "update"));
+                return ResponseEntity.ok((Object) c);
+            });
         }).orElse(ResponseEntity.notFound().build());
     }
 
@@ -166,37 +178,45 @@ public class AuditController {
                                            @RequestBody(required = false) FollowUpRequest req,
                                            HttpServletRequest http) {
         String actor = actor(http);
-        return cases.findById(id).<ResponseEntity<Object>>map(c -> {
-            if (!"SENT".equals(c.getStatus())) {
-                return ResponseEntity.status(409).body((Object) Map.of(
-                        "error", "no reply has been sent yet — review and approve the draft instead"));
-            }
-            if (req == null || req.body() == null || req.body().isBlank()) {
-                return ResponseEntity.badRequest().body((Object) Map.of(
-                        "error", "follow-up body is required"));
-            }
-            String subject = (req.subject() != null && !req.subject().isBlank())
-                    ? req.subject() : "Update on your complaint " + id;
+        return cases.findById(id).<ResponseEntity<Object>>map(snapshot -> {
+            boolean prepare = "SENT".equals(snapshot.getStatus())
+                    && (!highStakes(snapshot) || hasRole(http, ApiKeyFilter.ROLE_SUPERVISOR));
+            String context = prepare ? retrievedContext(snapshot.getComplaintText()) : "";
+            return transactions.withLockedCase(id, c -> {
+                if (!"SENT".equals(c.getStatus())) {
+                    return ResponseEntity.status(409).body((Object) Map.of(
+                            "error", "no reply has been sent yet — review and approve the draft instead"));
+                }
+                ResponseEntity<Object> denied = requireSupervisor(c, http, actor);
+                if (denied != null) return denied;
+                if (!sameApprovalInputs(snapshot, c)) return changedCase();
+                if (req == null || req.body() == null || req.body().isBlank()) {
+                    return ResponseEntity.badRequest().body((Object) Map.of(
+                            "error", "follow-up body is required"));
+                }
+                String subject = (req.subject() != null && !req.subject().isBlank())
+                        ? req.subject() : "Update on your complaint " + id;
 
-            // Same send gate; the original sent reply is also a legitimate grounding source.
-            List<String> issues = verifier.verify(subject, req.body(),
-                    c.getComplaintText(), retrievedContext(c.getComplaintText()),
-                    c.getClause(), c.getAckDue(), c.getResolutionDue(), c.getFinalBody());
-            boolean force = Boolean.TRUE.equals(req.force());
-            if (!issues.isEmpty() && !force) {
-                events.save(new AuditEvent(id, "verification",
-                        "follow-up BLOCKED by grounding check: " + String.join(" | ", issues)));
-                return ResponseEntity.unprocessableEntity().body((Object) Map.of(
-                        "error", "follow-up failed the grounding check", "issues", issues));
-            }
+                // Same send gate; the original sent reply is also a legitimate grounding source.
+                List<String> issues = verifier.verify(subject, req.body(),
+                        c.getComplaintText(), context,
+                        c.getClause(), c.getAckDue(), c.getResolutionDue(), c.getFinalBody());
+                boolean force = Boolean.TRUE.equals(req.force());
+                if (!issues.isEmpty() && !force) {
+                    events.save(new AuditEvent(id, "verification",
+                            "follow-up BLOCKED by grounding check: " + String.join(" | ", issues)));
+                    return ResponseEntity.unprocessableEntity().body((Object) Map.of(
+                            "error", "follow-up failed the grounding check", "issues", issues));
+                }
 
-            CaseMessage m = messages.save(new CaseMessage(id, subject, req.body()));
-            events.save(new AuditEvent(id, "follow-up", "by '" + actor + "' — " + (issues.isEmpty()
-                    ? "sent a follow-up: " + subject
-                    : "sent with OVERRIDE despite grounding issues: " + String.join(" | ", issues))));
-            email.sendFollowUp(c, subject, req.body());
-            caseEvents.publish(c.getTrackingToken(), "update");
-            return ResponseEntity.ok((Object) m);
+                CaseMessage m = messages.save(new CaseMessage(id, subject, req.body()));
+                events.save(new AuditEvent(id, "follow-up", "by '" + actor + "' — " + (issues.isEmpty()
+                        ? "sent a follow-up: " + subject
+                        : "sent with OVERRIDE despite grounding issues: " + String.join(" | ", issues))));
+                delivery.schedule(() -> email.sendFollowUp(c, subject, req.body()));
+                delivery.schedule(() -> caseEvents.publish(c.getTrackingToken(), "update"));
+                return ResponseEntity.ok((Object) m);
+            });
         }).orElse(ResponseEntity.notFound().build());
     }
 
@@ -225,6 +245,39 @@ public class AuditController {
         }).toList();
     }
 
+    private ResponseEntity<Object> requireSupervisor(CaseRecord c, HttpServletRequest http, String actor) {
+        if (!highStakes(c) || hasRole(http, ApiKeyFilter.ROLE_SUPERVISOR)) return null;
+        events.save(new AuditEvent(c.getComplaintId(), "maker-checker",
+                "approval by '" + actor + "' REFUSED — CRITICAL/escalated cases require the supervisor role"));
+        return ResponseEntity.status(403).body(Map.of(
+                "error", "maker-checker: CRITICAL and escalated cases require a supervisor to approve",
+                "requiredRole", ApiKeyFilter.ROLE_SUPERVISOR));
+    }
+
+    private static boolean highStakes(CaseRecord c) {
+        return "CRITICAL".equals(c.getUrgency()) || c.isEscalate();
+    }
+
+    // Reject stale preparation rather than approving a different case snapshot.
+    private static boolean sameApprovalInputs(CaseRecord a, CaseRecord b) {
+        return a.isEscalate() == b.isEscalate()
+                && Objects.equals(a.getUrgency(), b.getUrgency())
+                && Objects.equals(a.getCustomerEmail(), b.getCustomerEmail())
+                && Objects.equals(a.getTrackingToken(), b.getTrackingToken())
+                && Objects.equals(a.getComplaintText(), b.getComplaintText())
+                && Objects.equals(a.getCustomerName(), b.getCustomerName())
+                && Objects.equals(a.getDraftSubject(), b.getDraftSubject())
+                && Objects.equals(a.getDraftBody(), b.getDraftBody())
+                && Objects.equals(a.getClause(), b.getClause())
+                && Objects.equals(a.getAckDue(), b.getAckDue())
+                && Objects.equals(a.getResolutionDue(), b.getResolutionDue())
+                && Objects.equals(a.getFinalBody(), b.getFinalBody());
+    }
+
+    private static ResponseEntity<Object> changedCase() {
+        return ResponseEntity.status(409).body(Map.of("error", "case changed during review — reload and retry"));
+    }
+
     private static String nzs(String s) {
         return s == null ? "" : s;
     }
@@ -249,3 +302,4 @@ public class AuditController {
         }
     }
 }
+

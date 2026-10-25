@@ -37,6 +37,23 @@ Every AI-drafted reply passes a **grounding check** at draft time and again at s
 - Template debris — `[Bank Name]`-style placeholders, unfilled `{tokens}`, raw ISO
   timestamps — also blocks the send.
 
+## Approval and notification boundaries
+
+- Initial replies and follow-ups both require a supervisor for CRITICAL or escalated
+  cases. `force=true` overrides only the grounding check, never this role check.
+- Review mutations use a database row lock and a single transaction for the case,
+  message, and approval audit records. Concurrent initial approvals can commit only
+  one final reply; subsequent attempts return 409 without another notification.
+- Retrieval and summarization run before the lock. The locked transaction rechecks
+  authorization and the preparation inputs; stale inputs return 409.
+- Email and portal updates run only after a successful commit. Email audit writes
+  use a separate transaction. A notification failure does not reopen the approved reply.
+- Delivery remains best-effort, not exactly-once SMTP: a process crash after commit
+  can lose a notification, and ambiguous SMTP failures need manual reconciliation.
+  No automatic retry or durable outbox is added here. `SENT` means the reply is
+  committed and available in the portal, not proof of email receipt. Follow-ups are
+  distinct append operations; retrying a follow-up can create another message.
+
 ## Data protection (PII)
 
 - **Trust boundary:** classification and embeddings run locally. Translation, drafting,
