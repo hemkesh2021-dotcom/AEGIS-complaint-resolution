@@ -4,11 +4,12 @@ import com.aegis.api.dto.ComplaintResponse;
 import com.aegis.api.entity.AuditEvent;
 import com.aegis.api.entity.CaseRecord;
 import com.aegis.api.repo.AuditEventRepository;
-import com.aegis.api.repo.CaseRepository;
+import com.aegis.api.repo.CaseCreationRepository;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,11 +24,11 @@ public class AuditService {
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    private final CaseRepository cases;
+    private final CaseCreationRepository cases;
     private final AuditEventRepository events;
     private final CaseIntelligenceService intelligence;
 
-    public AuditService(CaseRepository cases, AuditEventRepository events,
+    public AuditService(CaseCreationRepository cases, AuditEventRepository events,
                         CaseIntelligenceService intelligence) {
         this.cases = cases;
         this.events = events;
@@ -70,7 +71,12 @@ public class AuditService {
         c.setChannel(r.channel());
         c.setLanguage(r.language());
         c.setCreatedAt(Instant.now());
-        cases.save(c);
+        try {
+            // Creation must never merge an existing case, even if requests race.
+            cases.insert(c);
+        } catch (DataIntegrityViolationException e) {
+            throw new ComplaintConflictException(e);
+        }
 
         String id = r.complaintId();
         if (r.language() != null && !"English".equals(r.language())) {
@@ -99,3 +105,4 @@ public class AuditService {
                 r.escalation().level() + " — " + r.escalation().reason()));
     }
 }
+

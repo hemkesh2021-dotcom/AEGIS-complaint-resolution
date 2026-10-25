@@ -53,7 +53,7 @@ public class PipelineService {
     public ComplaintResponse run(ComplaintRequest req, String defaultChannel) {
         String customer = isBlank(req.customerName()) ? "Customer" : req.customerName();
         String id = isBlank(req.complaintId())
-                ? "CMP-" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase()
+                ? "CMP-" + java.util.UUID.randomUUID().toString().toUpperCase(java.util.Locale.ROOT)
                 : req.complaintId();
 
         // Phase 1b — language: the customer writes in their language, the pipeline
@@ -129,4 +129,5 @@ public class PipelineService {
         return s == null || s.isBlank();
     }
 }
+
 

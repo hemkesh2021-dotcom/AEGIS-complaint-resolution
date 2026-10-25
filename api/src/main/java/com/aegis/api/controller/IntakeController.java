@@ -56,7 +56,10 @@ public class IntakeController {
 
     @PostMapping("/intake")
     public AckResponse intake(@Valid @RequestBody ComplaintRequest request) {
-        ComplaintResponse r = pipeline.run(request, "WEB");
+        // Public submissions cannot select an existing case's database identity.
+        ComplaintRequest newComplaint = new ComplaintRequest(request.text(), request.customerName(),
+                request.email(), null, request.receivedAt(), request.channel());
+        ComplaintResponse r = pipeline.run(newComplaint, "WEB");
         // The tracking token — not the guessable reference — is the customer's status key.
         String token = cases.findById(r.complaintId())
                 .map(c -> {
@@ -129,3 +132,4 @@ public class IntakeController {
         return "SENT".equals(status) ? "Responded" : "Under review";
     }
 }
+
