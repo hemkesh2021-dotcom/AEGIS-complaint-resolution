@@ -13,7 +13,7 @@
 
     <groupId>com.aegis</groupId>
     <artifactId>aegis-api</artifactId>
-    <version>4.0.0</version>
+    <version>4.0.1</version>
     <name>aegis-api</name>
     <description>AEGIS v4 - assisted complaint resolution</description>
 

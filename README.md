@@ -7,17 +7,16 @@ A banking grievance system that takes a complaint from intake to a regulator-awa
 
 A **Spring Boot** (Java 21) orchestrator chains seven phases — ingest → classify → compliance → retrieve → draft → verify → audit — calling a **Python DistilBERT** classifier, **pgvector** retrieval, and your chosen AI provider for drafting. Anthropic, NVIDIA NIM, OpenAI, Gemini, Groq, OpenRouter, Ollama and custom OpenAI-compatible endpoints are supported. Provider failures fall back to deterministic templates. Customers get a live-updating portal; operators review and approve responses; each case has an audit trail.
 
-## New in v4
+## Current release: v4.0.1
 
-- Light and dark workspaces with restrained neumorphic controls and responsive layouts.
-- Search the latest 50 cases by reference, customer or category. Sort by urgency, deadline or creation date; filter overdue cases; save personal views in your browser.
-- Export the filtered queue to CSV without customer names, narratives or tracking tokens. Formula-like values are escaped.
-- Command palette (Ctrl/Cmd+K) for navigation, connection settings and theme switching.
-- Server-side provider configuration, credential isolation, bounded timeouts, sanitized errors, process-local diagnostics and a supervisor-only connection test.
-- Maximum graphics: 4096px shadow maps, up to 2.5x pixel ratio, 5,000 particles, dark-mode bloom and FXAA. Balanced and Low power modes, component focus, camera controls, motion pause and PNG capture. Labels are culled when they overlap; the component selector reaches every node.
-- Customer portal opens with empty fields rather than a prefilled test complaint.
+This correction restores the original UI/UX. The operator console, customer portal and inbox match the pre-v4 interface; the system map keeps its original colors, layout, labels, controls and navigation. The v4.0.0 interface redesign has been removed.
 
-See [provider setup](docs/PROVIDERS.md), [release notes](docs/RELEASE-v4.md), and [research and product decisions](docs/V4-RESEARCH.md). This is a self-hosted single-tenant release, not a certification of production readiness or regulatory compliance.
+- Graphics-only upgrades to the existing 3D map: 4096px desktop shadow maps, 1024px environment reflections, up to 2.5x device pixel ratio, maximum supported screen-texture anisotropy and 5,000 desktop particles.
+- Miniature display panels face the camera for legibility. Existing bloom, FXAA, orbit, zoom, component picking and journey controls remain in place.
+- The original automatic balanced profile remains on narrow screens and low-core devices to limit GPU load. Optional postprocessing dependencies have a guarded native-rendering fallback.
+- Backend provider support is retained: Anthropic, NIM, OpenAI, Gemini, Groq, OpenRouter, Ollama and custom compatible endpoints. Configuration uses server-side environment variables; protected API diagnostics and a supervisor-only connection test remain available without adding interface controls.
+
+See [provider setup](docs/PROVIDERS.md), [current release notes](docs/RELEASE-v4.0.1.md), and [research and product decisions](docs/V4-RESEARCH.md). This is a self-hosted single-tenant release, not a certification of production readiness or regulatory compliance.
 
 **Explore the [interactive 3D architecture](frontend/architecture.html)** at `http://localhost:8088/architecture.html`. Animated journeys illustrate service relationships; they are not live request telemetry.
 

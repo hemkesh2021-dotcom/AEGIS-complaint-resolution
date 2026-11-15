@@ -8,7 +8,7 @@ on:
 
 jobs:
   frontend:
-    name: Workspace and graphics browser checks
+    name: Original interface and graphics browser checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

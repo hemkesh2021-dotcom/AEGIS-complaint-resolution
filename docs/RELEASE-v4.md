@@ -1,5 +1,7 @@
 # AEGIS 4.0.0 - Workspace and provider choice
 
+> Historical release notes. Superseded by [v4.0.1](RELEASE-v4.0.1.md), which restores the original interface at the owner's request. The interface features described below are not present in the current release. Backend provider support is retained.
+
 AEGIS 4 adds a redesigned light/dark operator workspace, faster triage and multiple AI providers while retaining the verified approval and privacy fixes on main.
 
 ## Shipped

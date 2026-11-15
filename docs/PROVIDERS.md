@@ -1,6 +1,6 @@
 # AI providers in AEGIS 4
 
-Keys belong in the API server's environment or your deployment secret manager. The browser only displays configuration status and generates a placeholder configuration. It never collects or returns provider keys. Operator credentials and provider credentials are separate.
+Keys belong in the API server's environment or your deployment secret manager. Provider configuration and diagnostics are server-side; there is no provider settings screen in the original interface restored in v4.0.1. Operator credentials and provider credentials are separate. Never enter a provider key into the console's Operator API key field.
 
 ## Anthropic
 
@@ -12,7 +12,17 @@ ANTHROPIC_API_KEY=your-key
 AEGIS_LLM_MODEL=your-available-claude-model-id
 ```
 
-Use a model ID enabled for your account, not the placeholder above. Run `docker compose up -d --build api`. Open AI providers in the console, authenticate as a supervisor, and use Test connection. The test makes one billable model call containing no customer data.
+Use a model ID enabled for your account, not the placeholder above. Run `docker compose up -d --build api`. Check the protected API using an operator credential. The optional connection test makes one billable model call containing no customer data:
+
+```bash
+# AEGIS_API_KEY is your deployment's operator API key, not a provider key.
+curl --fail-with-body -H "X-API-Key: $AEGIS_API_KEY" http://localhost:8080/api/providers
+
+# Optional billable probe; OIDC deployments require a supervisor bearer token instead.
+curl --fail-with-body -X POST -H "X-API-Key: $AEGIS_API_KEY" http://localhost:8080/api/providers/test
+```
+
+For OIDC-only deployments, replace the header with `Authorization: Bearer $ACCESS_TOKEN`. Use HTTPS outside local development. Do not paste real credentials into documentation or commit them.
 
 The native Anthropic adapter calls `/v1/messages` with `x-api-key`, `anthropic-version`, a top-level system instruction, messages and `max_tokens`. The compatibility version defaults to `2023-06-01`; override `ANTHROPIC_VERSION` when your provider requires a different supported version. Text blocks are combined; truncated responses fail into the template path.
 

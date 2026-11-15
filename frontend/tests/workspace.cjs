@@ -1,11 +1,61 @@
 const { chromium } = require("playwright");
 const assert = require("node:assert/strict");
+const { createHash } = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const { createServer } = require("node:http");
 
+const root = path.resolve(__dirname, "..");
+
+// Freeze the approved interface from 15a8090; only the map renderer may change.
+const original = {
+  "index.html":
+    "bf2e58aad16536208bf0bca3223360e4a72b990bdd7a285b437e05efa1b88864",
+  "portal.html":
+    "9ab856a56a81cbc51c4b0bfd28fefbaf62989f4989eedfaf26a010998274cb8d",
+  "inbox.html":
+    "d3744eda1b67b2b66437ce096e0b4a8e8ccbbb59c348e91469b177e4cecbe4e1",
+  "architecture.html":
+    "a6925ce8ec64a88fd9e5fedb64b5253494b085435d480d5a86cae9711960badf",
+};
+for (const [name, hash] of Object.entries(original)) {
+  let source = fs.readFileSync(path.join(root, name), "utf8");
+  if (name === "architecture.html")
+    source = source.slice(0, source.indexOf("<script>"));
+  assert.equal(
+    createHash("sha256").update(source).digest("hex"),
+    hash,
+    `${name}: original interface must remain unchanged`,
+  );
+}
+
+async function canvasPixels(page) {
+  return page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        requestAnimationFrame(() => {
+          const source = document.querySelector("#scene");
+          const canvas = document.createElement("canvas");
+          canvas.width = 180;
+          canvas.height = 120;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+          const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+          const colors = new Set();
+          let bright = 0;
+          for (let i = 0; i < data.length; i += 4) {
+            colors.add(
+              `${data[i] >> 4},${data[i + 1] >> 4},${data[i + 2] >> 4}`,
+            );
+            if (Math.max(data[i], data[i + 1], data[i + 2]) > 70) bright++;
+          }
+          resolve({ colors: colors.size, bright });
+        }),
+      ),
+  );
+}
+
 (async () => {
-  const root = path.resolve(__dirname, "..");
   const server = createServer((req, res) => {
     const file = path.join(root, new URL(req.url, "http://localhost").pathname);
     if (
@@ -28,24 +78,27 @@ const { createServer } = require("node:http");
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
-  const browser = await chromium.launch({
-    headless: true,
-    ...(process.env.CHROME_PATH
-      ? { executablePath: process.env.CHROME_PATH }
-      : {}),
-    args: [
-      "--enable-webgl",
-      "--ignore-gpu-blocklist",
-      "--use-angle=swiftshader",
-    ],
-  });
-  const artifacts = process.env.AEGIS_TEST_ARTIFACTS || "/tmp/aegis-v4-browser";
-  fs.mkdirSync(artifacts, { recursive: true });
-  const errors = [];
+  let browser;
   try {
+    browser = await chromium.launch({
+      headless: true,
+      ...(process.env.CHROME_PATH
+        ? { executablePath: process.env.CHROME_PATH }
+        : {}),
+      args: [
+        "--enable-webgl",
+        "--ignore-gpu-blocklist",
+        "--use-angle=swiftshader",
+      ],
+    });
+    const artifacts =
+      process.env.AEGIS_TEST_ARTIFACTS || "/tmp/aegis-v4.0.1-browser";
+    fs.mkdirSync(artifacts, { recursive: true });
+    const errors = [];
     const page = await browser.newPage({
       viewport: { width: 1440, height: 1000 },
     });
+    page.setDefaultTimeout(20000);
     page.on("pageerror", (e) => errors.push(e.message));
     const fixture = [
       {
@@ -56,7 +109,6 @@ const { createServer } = require("node:http");
         status: "IN_REVIEW",
         confidence: 0.95,
         escalate: true,
-        resolutionDue: "2026-01-01T12:00",
         createdAt: "2026-01-01T10:00Z",
       },
       {
@@ -67,138 +119,137 @@ const { createServer } = require("node:http");
         status: "SENT",
         confidence: 0.89,
         escalate: false,
-        resolutionDue: "2026-01-03T12:00",
         createdAt: "2026-01-02T10:00Z",
       },
     ];
-    await page.route("http://localhost:8080/**", async (route) => {
+    await page.route("http://localhost:8080/**", (route) => {
       const url = route.request().url();
-      const data = url.endsWith("/api/complaints")
-        ? fixture
-        : url.endsWith("/api/providers")
-          ? {
-              provider: "anthropic",
-              model: "account-model",
-              configured: true,
-              successfulCalls: 4,
-              failedCalls: 0,
-              timeoutSeconds: 30,
-            }
-          : url.endsWith("/test")
-            ? { ok: true }
-            : { status: "UP" };
-      await route.fulfill({ json: data });
+      return route.fulfill({
+        json: url.endsWith("/api/complaints")
+          ? fixture
+          : url.endsWith("/api/escalations")
+            ? [fixture[0]]
+            : { status: "UP" },
+      });
     });
+    await page.route("http://localhost:8025/**", (route) =>
+      route.fulfill({ json: { total: 0, messages: [] } }),
+    );
     await page.addInitScript(() => {
       localStorage.setItem("aegisKey", "fixture-key");
-      localStorage.setItem("aegisTheme", "light");
+      Object.defineProperty(navigator, "hardwareConcurrency", { get: () => 8 });
     });
+
     await page.goto(base + "/index.html");
-    await page.locator("#queueBody [data-case]").first().waitFor();
-    assert.equal(await page.locator("#queueBody [data-case]").count(), 1);
+    await page.locator("#queueBody tr.clickable").first().waitFor();
+    assert.equal(await page.locator("#queueBody tr.clickable").count(), 1);
+    assert.deepEqual(
+      await page
+        .locator(".navbtn")
+        .evaluateAll((nodes) => nodes.map((n) => n.dataset.tab)),
+      ["queue", "esc", "ins", "new", "sys"],
+    );
     await page.locator('[data-f="all"]').click();
-    assert.equal(await page.locator("#queueBody [data-case]").count(), 2);
-    await page.locator("#queueSearch").fill("Mortgage");
-    assert.equal(await page.locator("#queueBody [data-case]").count(), 1);
-    await page.locator("#saveView").click();
-    await page.locator("#viewName").fill("Mortgage review");
-    await page.getByRole("button", { name: "Save view", exact: true }).click();
-    await page
-      .locator("#savedViews option")
-      .nth(1)
-      .waitFor({ state: "attached" });
-    assert.equal(await page.locator("#savedViews option").count(), 2);
-    const download = page.waitForEvent("download");
-    await page.locator("#exportQueue").click();
-    const file = await download;
-    const csv = fs.readFileSync(await file.path(), "utf8");
-    assert.ok(csv.includes("CMP-1002"));
-    assert.ok(!csv.includes("Demo customer"));
-    await page.locator("#queueSearch").fill("");
-    await page.screenshot({
-      path: path.join(artifacts, "workspace-light.png"),
-    });
-    await page.locator("[data-theme-toggle]").click();
-    assert.equal(await page.locator("html").getAttribute("data-theme"), "dark");
-    await page.screenshot({ path: path.join(artifacts, "workspace-dark.png") });
-    await page.locator("#commandOpen").click();
-    await page.locator("#commandSearch").fill("AI providers");
-    await page.locator("#commandList button").click();
-    await page.locator("#providerStatus h2").waitFor();
-    assert.equal(
-      await page.locator("#providerStatus h2").textContent(),
-      "anthropic",
+    await page.waitForFunction(
+      () => document.querySelectorAll("#queueBody tr.clickable").length === 2,
     );
-    await page.locator("#testProvider").click();
-    await page
-      .getByText("Connection verified. No customer data was sent.")
-      .waitFor();
-    await page.screenshot({ path: path.join(artifacts, "providers.png") });
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.locator('[data-f="sent"]').click();
+    await page.waitForFunction(
+      () => document.querySelectorAll("#queueBody tr.clickable").length === 1,
+    );
+    assert.ok(
+      (await page.locator("#queueBody").textContent()).includes("CMP-1002"),
+    );
+    await page.locator('[data-tab="new"]').click();
+    await page.locator("#ex").selectOption("1");
+    assert.ok((await page.locator("#text").inputValue()).includes("mortgage"));
     await page.locator('[data-tab="queue"]').click();
-    assert.equal(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
-      ),
-      true,
-    );
     await page.screenshot({
-      path: path.join(artifacts, "workspace-mobile.png"),
+      path: path.join(artifacts, "original-console.png"),
     });
-    await page.goto(base + "/portal.html");
-    assert.equal(await page.locator("#name").inputValue(), "");
-    assert.equal(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
-      ),
-      true,
-    );
-    await page.screenshot({ path: path.join(artifacts, "portal-mobile.png") });
+
     for (const size of [
       { width: 1440, height: 1000 },
       { width: 390, height: 844 },
     ]) {
       await page.setViewportSize(size);
+      await page.goto(base + "/portal.html");
+      assert.equal(await page.locator("#name").inputValue(), "A. Rao");
+      assert.equal(await page.locator("#send").isVisible(), true);
+      await page.screenshot({
+        path: path.join(artifacts, `original-portal-${size.width}.png`),
+      });
+
       await page.goto(base + "/architecture.html");
       await page.waitForFunction(
         () => typeof window.__AEGIS_VISUAL_DIAGNOSTICS__ === "function",
       );
-      await page.waitForTimeout(3500);
+      await page.waitForTimeout(4000);
       const diag = await page.evaluate(() =>
         window.__AEGIS_VISUAL_DIAGNOSTICS__(),
       );
-      assert.equal(diag.quality, "MAXIMUM");
+      const constrained = size.width < 760;
+      assert.equal(diag.quality, constrained ? "BALANCED" : "ULTRA");
       assert.equal(diag.nodes, 13);
-      assert.equal(diag.particles, 5000);
+      assert.equal(diag.particles, constrained ? 1100 : 5000);
+      assert.equal(diag.shadowMapSize, constrained ? 1024 : 4096);
+      assert.equal(diag.reflectionSize, constrained ? 256 : 1024);
+      assert.equal(diag.postProcessing, true);
+      assert.ok(diag.drawCalls > 0 && diag.triangles > 0);
+      assert.equal(await page.locator(".phase").count(), 9);
       assert.equal(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= innerWidth,
         ),
         true,
       );
+      const pixels = await canvasPixels(page);
+      assert.ok(
+        pixels.colors > 20 && pixels.bright > 50,
+        `nonblank canvas: ${JSON.stringify(pixels)}`,
+      );
       await page.screenshot({
-        path: path.join(artifacts, `map-${size.width}.png`),
+        path: path.join(artifacts, `graphics-${size.width}.png`),
       });
-      await page.locator('[data-theme-toggle]').click();
-      await page.screenshot({path: path.join(artifacts, `map-dark-${size.width}.png`)});
       const before = await page.locator("#scene").screenshot();
       await page.waitForTimeout(500);
-      const after = await page.locator("#scene").screenshot();
-      assert.ok(!before.equals(after), "scene must animate");
-      await page.locator("#componentSelect").selectOption("identity");
-      await page.locator("#panel").waitFor({ state: "visible" });
       assert.ok(
-        (await page.locator("#panelBody").textContent()).includes(
-          "Identity Vault",
+        !before.equals(await page.locator("#scene").screenshot()),
+        "scene must animate",
+      );
+      await page.locator("#play").click();
+      assert.ok(
+        (await page.locator("#play").textContent()).includes("play journey"),
+      );
+      await page.locator(".phase").nth(2).click();
+      assert.ok(
+        (await page.locator(".phase").nth(2).getAttribute("class")).includes(
+          "lit",
         ),
       );
-      await page.locator("#resetView").click();
-      await page.locator("#motionToggle").click();
-      const shot = page.waitForEvent("download");
-      await page.locator("#mapCapture").click();
-      assert.ok((await shot).suggestedFilename().endsWith(".png"));
+      await page.mouse.move(size.width / 2, size.height / 2);
+      const startTheta = await page.evaluate(() => theta);
+      await page.mouse.down();
+      await page.mouse.move(size.width / 2 + 60, size.height / 2 + 20, {
+        steps: 5,
+      });
+      await page.mouse.up();
+      assert.ok(
+        Math.abs((await page.evaluate(() => theta)) - startTheta) > 0.2,
+        "original orbit control works",
+      );
+      await page.mouse.wheel(0, -100);
+      await page.waitForFunction(() => radiusGoal < HOME_RADIUS);
+      await page
+        .locator("#scene")
+        .dblclick({ position: { x: size.width / 2, y: size.height / 2 } });
+      assert.equal(await page.evaluate(() => radiusGoal === HOME_RADIUS), true);
+      console.log(`${size.width}px: ${JSON.stringify({ ...diag, pixels })}`);
     }
-    await page.goto(base + "/architecture.html?quality=low");
+
+    // A missing optional postprocessing dependency must retain native WebGL rendering.
+    await page.route("**/FXAAShader.js", (route) => route.abort());
+    await page.goto(base + "/architecture.html");
     await page.waitForFunction(
       () => typeof window.__AEGIS_VISUAL_DIAGNOSTICS__ === "function",
     );
@@ -207,17 +258,23 @@ const { createServer } = require("node:http");
         .postProcessing,
       false,
     );
-    await page.emulateMedia({reducedMotion:'reduce'});
-    await page.goto(base + '/architecture.html?quality=low');
-    await page.waitForFunction(() => typeof window.__AEGIS_VISUAL_DIAGNOSTICS__ === 'function');
-    assert.equal(await page.locator('#motionToggle').textContent(), 'Resume motion');
+    await page.waitForTimeout(3000);
+    assert.ok((await canvasPixels(page)).colors > 20);
+
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto(base + "/inbox.html");
+    await page.waitForFunction(
+      () => !document.querySelector("#msgs").textContent.includes("Connecting"),
+    );
+    assert.equal(await page.locator(".folder").count(), 4);
+    await page.screenshot({ path: path.join(artifacts, "original-inbox.png") });
     assert.deepEqual(errors, []);
     console.log(
-      "PASS: search, saved views, CSV, command palette, providers, themes, mobile layout, animated WebGL, component focus, capture and low-power renderer.",
+      "PASS: original UI fingerprints, queue filters, example selection, portal/inbox, desktop/mobile graphics, animation, orbit/zoom/reset, journey and rendering fallback.",
     );
     console.log("Artifacts: " + artifacts);
   } finally {
-    await browser.close();
+    if (browser) await browser.close();
     await new Promise((resolve) => server.close(resolve));
   }
 })().catch((e) => {
