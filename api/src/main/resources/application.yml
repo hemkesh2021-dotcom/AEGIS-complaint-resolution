@@ -38,7 +38,7 @@ spring:
     open-in-view: false
   ai:
     model:
-      chat: openai          # NIM (OpenAI-compatible) for drafting
+      chat: none            # ProviderChatModel owns the selected destination
       embedding: transformers   # local ONNX embeddings (no API key)
     openai:
       base-url: ${NIM_BASE_URL:https://integrate.api.nvidia.com}

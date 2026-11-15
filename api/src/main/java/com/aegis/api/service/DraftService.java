@@ -105,7 +105,8 @@ public class DraftService {
                 if (reply != null && !reply.isBlank()) {
                     // substitute the supplied name locally after generation
                     reply = reply.replace(NAME_TOKEN, customerName);
-                    return new Draft(extractSubject(reply, complaintId), cleanReply(reply), "NVIDIA NIM (RAG)");
+                    String source = chatModel instanceof ProviderChatModel p ? p.source() : "AI (RAG)";
+                    return new Draft(extractSubject(reply, complaintId), cleanReply(reply), source);
                 }
             } catch (Exception e) {
                 log.warn("LLM drafting failed ({}); using template engine.", e.getMessage());

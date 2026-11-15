@@ -24,3 +24,7 @@ models/
 .vscode/
 *.iml
 .DS_Store
+
+# Frontend test dependencies and output
+node_modules/
+test-results/

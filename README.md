@@ -1,13 +1,25 @@
-# AEGIS — Agentic Complaint Resolution
+# AEGIS v4 — Assisted Complaint Resolution
 
 ![CI](https://github.com/hemkesh2021-dotcom/AEGIS-complaint-resolution/actions/workflows/ci.yml/badge.svg)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A banking grievance system that takes a complaint from intake to a regulator-aware, human-approved response — and **verifies its own AI before anything reaches a customer**.
 
-A **Spring Boot** (Java 21) orchestrator chains seven phases — ingest → classify → compliance → retrieve → draft → verify → audit — calling a **Python DistilBERT** classifier, **pgvector** RAG retrieval over regulation passages, and an external LLM (**NVIDIA NIM**) for drafting, with a deterministic template engine as automatic fallback. Customers get a live-updating portal; operators get an urgency-sorted review console; every case gets an append-only audit trail.
+A **Spring Boot** (Java 21) orchestrator chains seven phases — ingest → classify → compliance → retrieve → draft → verify → audit — calling a **Python DistilBERT** classifier, **pgvector** retrieval, and your chosen AI provider for drafting. Anthropic, NVIDIA NIM, OpenAI, Gemini, Groq, OpenRouter, Ollama and custom OpenAI-compatible endpoints are supported. Provider failures fall back to deterministic templates. Customers get a live-updating portal; operators review and approve responses; each case has an audit trail.
 
-**Explore the system as an [interactive 3D architecture](frontend/architecture.html)** — served at `http://localhost:8088/architecture.html` once the stack is up. Every pulse in the animation is a real data path.
+## New in v4
+
+- Light and dark workspaces with restrained neumorphic controls and responsive layouts.
+- Search the latest 50 cases by reference, customer or category. Sort by urgency, deadline or creation date; filter overdue cases; save personal views in your browser.
+- Export the filtered queue to CSV without customer names, narratives or tracking tokens. Formula-like values are escaped.
+- Command palette (Ctrl/Cmd+K) for navigation, connection settings and theme switching.
+- Server-side provider configuration, credential isolation, bounded timeouts, sanitized errors, process-local diagnostics and a supervisor-only connection test.
+- Maximum graphics: 4096px shadow maps, up to 2.5x pixel ratio, 5,000 particles, dark-mode bloom and FXAA. Balanced and Low power modes, component focus, camera controls, motion pause and PNG capture. Labels are culled when they overlap; the component selector reaches every node.
+- Customer portal opens with empty fields rather than a prefilled test complaint.
+
+See [provider setup](docs/PROVIDERS.md), [release notes](docs/RELEASE-v4.md), and [research and product decisions](docs/V4-RESEARCH.md). This is a self-hosted single-tenant release, not a certification of production readiness or regulatory compliance.
+
+**Explore the [interactive 3D architecture](frontend/architecture.html)** at `http://localhost:8088/architecture.html`. Animated journeys illustrate service relationships; they are not live request telemetry.
 
 ## Why it's different
 
@@ -45,7 +57,7 @@ safe-use notes are in [`data/README.md`](data/README.md).
 ## Quickstart
 
 ```bash
-cp .env.example .env        # set AEGIS_API_KEY (and NIM_API_KEY for live LLM drafts)
+cp .env.example .env        # set AEGIS_API_KEY; choose a provider using docs/PROVIDERS.md
 docker compose up --build
 ```
 
@@ -57,7 +69,7 @@ docker compose up --build
 | Email inbox (MailHog) | http://localhost:8025 — every customer email lands here locally |
 | API health | http://localhost:8080/health |
 
-Without a NIM key the pipeline still runs end to end — drafts come from the deterministic template engine (`"source": "Template engine"` instead of `"NVIDIA NIM (RAG)"`). On first startup the API ingests `knowledge/kb.json` into pgvector using local ONNX embeddings (no key needed).
+The example configuration uses template mode, so no paid AI key is needed to start. Select a provider, set its key and `AEGIS_LLM_MODEL`, then restart the API for AI drafting. Existing NIM-only environments remain supported. On first startup the API ingests `knowledge/kb.json` into pgvector using local ONNX embeddings.
 
 **Try the full loop:** lodge a complaint on the portal (note the `TRK-…` tracking code) → open the case in the console → edit the reply to add an invented figure like `$999` → **Approve & send** gets blocked by the grounding gate with named issues → fix it, send, and watch the portal flip to *Responded* with an AI summary and the full reply.
 

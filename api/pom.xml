@@ -13,9 +13,9 @@
 
     <groupId>com.aegis</groupId>
     <artifactId>aegis-api</artifactId>
-    <version>0.1.0</version>
+    <version>4.0.0</version>
     <name>aegis-api</name>
-    <description>AEGIS v2 orchestrator — agentic complaint resolution</description>
+    <description>AEGIS v4 - assisted complaint resolution</description>
 
     <licenses>
         <license>

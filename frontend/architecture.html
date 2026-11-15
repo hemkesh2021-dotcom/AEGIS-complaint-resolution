@@ -116,6 +116,8 @@
     padding:12px 10px 16px}.phase,.playbtn{flex:none}#panel{top:64px;left:12px;right:12px;width:auto;max-height:calc(100vh - 150px)}}
   @media (prefers-reduced-motion: reduce){*{animation-duration:.01s!important}}
 </style>
+<link rel="stylesheet" href="map-v4.css">
+<script src="theme.js"></script>
 </head>
 <body>
 <canvas id="scene"></canvas>
@@ -147,6 +149,7 @@
 
 <div id="hint">drag to orbit · scroll to zoom · click any component · double-click to reset</div>
 <div id="renderProfile"><b id="qualityLabel">ULTRA</b><span id="renderStats">initializing renderer</span><span class="meter"></span></div>
+<div id="mapTools"><label for="qualitySelect">Graphics</label><select id="qualitySelect"><option value="max">Maximum</option><option value="balanced">Balanced</option><option value="low">Low power</option></select><label for="componentSelect">Component</label><select id="componentSelect"><option value="">All components</option></select><button id="resetView" title="Reset camera" aria-label="Reset camera">&#8634;</button><button id="zoomIn" title="Zoom in" aria-label="Zoom in">+</button><button id="zoomOut" title="Zoom out" aria-label="Zoom out">&#8722;</button><button id="motionToggle" title="Toggle scene motion" aria-label="Toggle scene motion">Pause motion</button><button data-theme-toggle title="Toggle color theme" aria-label="Toggle color theme">Light / dark</button><button id="mapCapture" title="Download scene image">Capture</button></div>
 
 <div class="hud rail" id="rail">
   <button class="playbtn" id="play">❚❚ pause journey</button>
@@ -172,7 +175,7 @@ const EMBED=new URLSearchParams(location.search).has("embed");
 if(EMBED){$("#navlinks").style.display="none";document.querySelector(".tagline").style.display="none";}
 
 /* ───────────────────────── palette / easing ───────────────────────── */
-const C={bg:0x0C0A08,gold:0xDDB35A,goldHi:0xF0CF8E,info:0x7EC5DE,ok:0x5BBF92,purple:0xB48BE0,steel:0x9A917F,danger:0xE06B6B};
+const C={bg:0x101916,gold:0x73BFA2,goldHi:0xC3E8D6,info:0x69B7DF,ok:0x5BBF92,purple:0xC2A1D6,steel:0xA2B5AE,danger:0xE06B6B};
 const easeInOut=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
 const elastic=t=>t>=1?1:1-Math.pow(2,-10*t)*Math.cos(t*10.5);
 const lerp=(a,b,k)=>a+(b-a)*k;
@@ -180,11 +183,12 @@ const lerp=(a,b,k)=>a+(b-a)*k;
 /* ───────────────────────── renderer / scene ───────────────────────── */
 let renderer;
 const reducedMotion=matchMedia("(prefers-reduced-motion: reduce)").matches;
-const constrained=innerWidth<760||((navigator.hardwareConcurrency||8)<=4);
-const QUALITY=constrained?"BALANCED":"ULTRA";
-try{renderer=new THREE.WebGLRenderer({canvas:$("#scene"),antialias:true,powerPreference:"high-performance",stencil:false});}
+const qualityMode=new URLSearchParams(location.search).get("quality")||"max";
+const constrained=qualityMode!=="max";
+const QUALITY=qualityMode==="max"?"MAXIMUM":qualityMode==="low"?"LOW POWER":"BALANCED";
+try{renderer=new THREE.WebGLRenderer({canvas:$("#scene"),antialias:true,powerPreference:qualityMode==="low"?"low-power":"high-performance",stencil:false});}
 catch(e){$("#fallback").style.display="grid";throw e;}
-renderer.setPixelRatio(Math.min(devicePixelRatio,constrained?1.35:2));
+renderer.setPixelRatio(Math.min(devicePixelRatio,qualityMode==="low"?1:constrained?1.35:2.5));
 renderer.outputEncoding=THREE.sRGBEncoding;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=1.12;
@@ -193,7 +197,7 @@ renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(C.bg);
 scene.fog=new THREE.FogExp2(C.bg,0.011);
-const camera=new THREE.PerspectiveCamera(constrained?64:46,1,.1,400);
+const camera=new THREE.PerspectiveCamera(innerWidth<760?64:46,1,.1,400);
 
 /* environment map — procedural warm studio, gives PBR reflections */
 {
@@ -214,14 +218,14 @@ const camera=new THREE.PerspectiveCamera(constrained?64:46,1,.1,400);
 scene.add(new THREE.HemisphereLight(0xE8DCC2,0x100D09,.42));
 scene.add(new THREE.AmbientLight(0xFFF4E0,.18));
 const key=new THREE.DirectionalLight(0xFFE8C0,1.05);key.position.set(18,32,14);key.castShadow=!constrained;
-key.shadow.mapSize.set(constrained?1024:2048,constrained?1024:2048);key.shadow.camera.left=-32;key.shadow.camera.right=32;
+key.shadow.mapSize.set(constrained?1024:4096,constrained?1024:4096);key.shadow.camera.left=-32;key.shadow.camera.right=32;
 key.shadow.camera.top=32;key.shadow.camera.bottom=-32;key.shadow.camera.near=1;key.shadow.camera.far=90;key.shadow.bias=-.00025;scene.add(key);
 const rimL=new THREE.DirectionalLight(0x7EC5DE,.3);rimL.position.set(-22,14,-18);scene.add(rimL);
 const glowL=new THREE.PointLight(C.gold,1.2,70);glowL.position.set(0,11,0);scene.add(glowL);
 
 /* cinematic post-processing, with direct rendering as the offline/CDN fallback */
 let composer=null,bloomPass=null,fxaaPass=null;
-if(THREE.EffectComposer&&THREE.RenderPass&&THREE.UnrealBloomPass&&THREE.FXAAShader){
+if(qualityMode!=="low"&&THREE.EffectComposer&&THREE.RenderPass&&THREE.UnrealBloomPass&&THREE.FXAAShader&&THREE.ShaderPass&&THREE.CopyShader&&THREE.LuminosityHighPassShader){
   composer=new THREE.EffectComposer(renderer);
   composer.addPass(new THREE.RenderPass(scene,camera));
   bloomPass=new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),constrained?.36:.62,.62,.72);
@@ -282,8 +286,8 @@ function makeLabel(title,sub,accent){
   const cv=document.createElement("canvas");cv.width=620;cv.height=152;
   drawLabel(cv,title,sub,accent);
   const t=new THREE.CanvasTexture(cv);t.minFilter=THREE.LinearFilter;
-  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthWrite:false}));
-  s.scale.set(constrained?5.5:7.4,constrained?1.38:1.86,1);
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthWrite:false,depthTest:false,toneMapped:false}));
+  s.scale.set(6.4,1.61,1);s.renderOrder=100;
   LABELS.push({cv,t,title,sub,accent});
   return s;
 }
@@ -437,7 +441,7 @@ const stage=new THREE.Group();scene.add(stage);
 /* shadow receiver under the holographic floor */
 {
   const floorShadow=new THREE.Mesh(new THREE.CircleGeometry(31,96),
-    new THREE.MeshStandardMaterial({color:0x100D09,roughness:1,metalness:0,transparent:true,opacity:.62,depthWrite:false}));
+    new THREE.MeshStandardMaterial({color:0x728C7F,roughness:.85,metalness:.1,transparent:true,opacity:.2,depthWrite:false}));
   floorShadow.rotation.x=-Math.PI/2;floorShadow.position.y=-.04;floorShadow.receiveShadow=!constrained;stage.add(floorShadow);
 }
 /* radial gradient floor */
@@ -486,7 +490,7 @@ for(let i=0;i<16;i++){
 /* deep data field with per-particle system colors */
 let dustField;
 {
-  const n=constrained?1100:2800,pos=new Float32Array(n*3),colors=new Float32Array(n*3);
+  const n=qualityMode==="low"?300:constrained?1100:5000,pos=new Float32Array(n*3),colors=new Float32Array(n*3);
   const palette=[new THREE.Color(C.goldHi),new THREE.Color(C.info),new THREE.Color(C.ok),new THREE.Color(C.purple)];
   for(let i=0;i<n;i++){
     const radius=22+Math.pow(Math.random(),.72)*78,a=Math.random()*Math.PI*2;
@@ -521,7 +525,7 @@ function registerNode(id,group,pickMesh,pos,label,info,hotMats){
   const strip=new THREE.Mesh(roundedBoxGeo(2.6,.13,.3,.055),neonMat(C.gold,1.3));strip.position.y=1.66;
   const scr=new THREE.Mesh(new THREE.PlaneGeometry(2.62,3.15),
     new THREE.MeshBasicMaterial({map:screenTexture(480,576,drawPortalScreen)}));
-  scr.material.toneMapped=false;scr.position.set(0,-.06,.15);
+  scr.material.toneMapped=false;scr.material.transparent=true;scr.material.depthTest=false;scr.renderOrder=10;scr.position.set(0,-.06,.16);
   const halo=new THREE.Mesh(new THREE.TorusGeometry(2.0,.03,12,80),neonMat(C.gold,.8));
   halo.rotation.x=Math.PI/2;halo.position.y=-2.35;
   const gl=glowSprite(C.gold,4.6,.3);gl.position.y=-.1;
@@ -541,7 +545,7 @@ function registerNode(id,group,pickMesh,pos,label,info,hotMats){
   const strip=new THREE.Mesh(roundedBoxGeo(4.15,.13,.3,.055),neonMat(C.info,1.2));strip.position.y=1.24;
   const scr=new THREE.Mesh(new THREE.PlaneGeometry(4.16,2.29),
     new THREE.MeshBasicMaterial({map:screenTexture(800,440,drawConsoleScreen)}));
-  scr.material.toneMapped=false;scr.position.set(0,-.06,.15);
+  scr.material.toneMapped=false;scr.material.transparent=true;scr.material.depthTest=false;scr.renderOrder=10;scr.position.set(0,-.06,.16);
   /* a stand — consoles sit on desks */
   const stem=new THREE.Mesh(new THREE.CylinderGeometry(.09,.14,.9,24),metalMat(C.steel,{emissiveIntensity:.05}));
   stem.position.y=-1.75;
@@ -684,10 +688,10 @@ function registerNode(id,group,pickMesh,pos,label,info,hotMats){
   g.add(gl,core,shell,ring);
   g.userData.wire=shell;g.userData.pring=ring;
   registerNode("nim",g,core,new THREE.Vector3(18.5,4.4,11.5),
-    makeLabel("External Intelligence","NVIDIA NIM · redacted prompts only","#B48BE0"),{
+    makeLabel("AI Provider","Bring your own model · redacted prompts","#B48BE0"),{
     title:"External Intelligence",sub:"outside the trust boundary",labelH:3.3,
-    tags:["OpenAI-compatible","drafting + summaries","template fallback"],
-    code:["DraftService.java"],
+    tags:["Anthropic / NIM / OpenAI / Gemini","Groq / OpenRouter / Ollama","template fallback"],
+    code:["ProviderChatModel.java","DraftService.java"],
     text:"The only component outside the boundary — and it's treated that way. It receives redacted, name-tokenized prompts and returns draft replies and customer summaries, grounded in the retrieved regulation context. If it's down, slow, or keyless, the deterministic template engine takes over mid-flight. It never sees raw PII."},
     [shell.material]);
 }
@@ -779,7 +783,7 @@ function registerNode(id,group,pickMesh,pos,label,info,hotMats){
   const strip=new THREE.Mesh(roundedBoxGeo(3.95,.13,.3,.055),neonMat(C.gold,1.0));strip.position.y=1.16;
   const scr=new THREE.Mesh(new THREE.PlaneGeometry(3.96,2.1),
     new THREE.MeshBasicMaterial({map:screenTexture(800,420,drawInboxScreen)}));
-  scr.material.toneMapped=false;scr.position.set(0,-.06,.15);
+  scr.material.toneMapped=false;scr.material.transparent=true;scr.material.depthTest=false;scr.renderOrder=10;scr.position.set(0,-.06,.16);
   const halo=new THREE.Mesh(new THREE.TorusGeometry(2.2,.03,12,80),neonMat(C.ok,.7));
   halo.rotation.x=Math.PI/2;halo.position.y=-2.1;
   const gl=glowSprite(C.ok,4.2,.22);
@@ -904,12 +908,12 @@ function gateFlash(){
 
 /* ───────────────────────── camera ───────────────────────── */
 const target=new THREE.Vector3(0,2.4,0),targetGoal=target.clone(),homeTarget=target.clone(),parallax=new THREE.Vector3();
-const HOME_RADIUS=constrained?62:44;
-let theta=-.85,phi=1.1,radius=95,radiusGoal=HOME_RADIUS,lastInteract=0,dragging=false,px=0,py=0;
+const HOME_RADIUS=innerWidth<760?68:49;
+let theta=-.85,phi=1.1,radius=reducedMotion?HOME_RADIUS:95,radiusGoal=HOME_RADIUS,lastInteract=0,dragging=false,px=0,py=0;
 const introStart=performance.now();
 function applyCam(now){
   target.lerp(targetGoal,.055);
-  const intro=Math.min(1,(now-introStart)/2400);
+  const intro=reducedMotion?1:Math.min(1,(now-introStart)/2400);
   const ei=1-Math.pow(1-intro,3);
   const r=lerp(95,radius,ei),ph=lerp(.55,phi,ei);
   camera.position.set(
@@ -939,8 +943,9 @@ cv.addEventListener("mousemove",e=>{
   parallax.x=mouse.x*.9;parallax.y=mouse.y*.5;
   tip.style.left=(e.clientX+16)+"px";tip.style.top=(e.clientY+14)+"px";
 });
-cv.addEventListener("click",()=>{
+cv.addEventListener("click",e=>{
   if(performance.now()-clickArm>250)return;
+  mouse.set(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1);mouseMoved=true;pick();
   if(hovered){
     const inf=nodes[hovered].info;
     targetGoal.copy(nodes[hovered].group.position);targetGoal.y+=.35;radiusGoal=Math.max(15,Math.min(radiusGoal,20));
@@ -987,14 +992,17 @@ function resize(){
 }
 addEventListener("resize",resize);resize();
 
-let running=true;
+let running=true,sceneMotion=!reducedMotion,sceneTime=0,previousFrame=0;
 document.addEventListener("visibilitychange",()=>{running=!document.hidden;if(running)requestAnimationFrame(loop);});
 function loop(now){
   if(!running)return;
   requestAnimationFrame(loop);
+  const elapsed=previousFrame?Math.min(now-previousFrame,50):0;previousFrame=now;
+  if(sceneMotion)sceneTime+=elapsed;
   radius+=(radiusGoal-radius)*.06;
-  if(!dragging&&now-lastInteract>4500)theta+=.0011;
+  if(sceneMotion&&!dragging&&now-lastInteract>4500)theta+=.0006;
   applyCam(now);
+  const birthTime=now;now=sceneTime;
 
   if(dustField&&!reducedMotion)dustField.rotation.y=now*.000008;
   if(stage.userData.boundaryScan){
@@ -1007,7 +1015,7 @@ function loop(now){
   for(const id in nodes){
     const n=nodes[id];
     /* elastic entrance + hover scale */
-    const born=Math.max(0,Math.min(1,(now-n.born)/950));
+    const born=reducedMotion?1:Math.max(0,Math.min(1,(birthTime-n.born)/950));
     const target=(born>=1?1:elastic(born))*(n.hover?1.055:1);
     const s=lerp(n.group.scale.x,target,.16);
     n.group.scale.setScalar(Math.max(.0001,s));
@@ -1026,12 +1034,14 @@ function loop(now){
       const a=now*.0016+i*2.1;e.position.set(Math.cos(a)*1.55,Math.sin(a*1.3)*.5,Math.sin(a)*1.55);});}
     if(u.ringA){u.ringA.rotation.x=now*.0008;u.ringB.rotation.y=now*.001;u.core.rotation.y=now*.0013;}
     if(u.lockRing)u.lockRing.rotation.z=Math.sin(now*.0008)*.08;
-    if(u.auditRings)u.auditRings.forEach((r,i)=>{r.rotation.z=now*(i%2?.00055:-.00045);r.rotation.y+=.001*(i+1);});
+    if(u.auditRings)u.auditRings.forEach((r,i)=>{r.rotation.z=now*(i%2?.00055:-.00045);r.rotation.y=now*.0001*(i+1);});
     if(u.crystal)u.crystal.rotation.y=now*.0008;
+    if(["portal","console","mailClient"].includes(id))n.group.rotation.y=Math.atan2(camera.position.x-n.group.position.x,camera.position.z-n.group.position.z);
   }
   tb.rotation.y=now*.00005;
-  stepPulses(now);
+  stepPulses(birthTime);
   pick();
+  declutterLabels();
   composer?composer.render():renderer.render(scene,camera);
 }
 requestAnimationFrame(loop);
@@ -1043,6 +1053,31 @@ window.__AEGIS_VISUAL_DIAGNOSTICS__=()=>({
   flows:Object.keys(FLOWS).length,particles:dustField?.geometry?.attributes?.position?.count||0,
   drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,webgl2:renderer.capabilities.isWebGL2
 });
+function declutterLabels(){
+  scene.updateMatrixWorld(true);camera.updateMatrixWorld(true);
+  const occupied=[];
+  Object.entries(nodes).sort(([a],[b])=>a===hovered?-1:b===hovered?1:a==="api"?-1:b==="api"?1:0).forEach(([id,n])=>{
+    const world=n.label.getWorldPosition(new THREE.Vector3()),p=world.clone().project(camera);
+    const distance=world.distanceTo(camera.position),h=1.61*innerHeight/(2*distance*Math.tan(camera.fov*Math.PI/360)),w=h*4;
+    const x=(p.x+1)*innerWidth/2,y=(1-p.y)*innerHeight/2;
+    const box={x:x-w/2,y:y-h/2,w,h};
+    const overlaps=occupied.some(b=>box.x<b.x+b.w+5&&box.x+box.w+5>b.x&&box.y<b.y+b.h+5&&box.y+box.h+5>b.y);
+    n.label.visible=p.z<1&&p.z>-1&&box.x>4&&box.x+w<innerWidth-4&&box.y>65&&!overlaps;
+    if(n.label.visible)occupied.push(box);
+  });
+}
+$("#qualitySelect").value=["max","balanced","low"].includes(qualityMode)?qualityMode:"max";
+$("#qualitySelect").onchange=e=>{const url=new URL(location.href);url.searchParams.set("quality",e.target.value);location.href=url;};
+for(const [id,n] of Object.entries(nodes)){const option=document.createElement("option");option.value=id;option.textContent=n.info.title;$("#componentSelect").append(option);}
+$("#componentSelect").onchange=e=>{const id=e.target.value;if(!id){$("#resetView").click();return;}hovered=id;targetGoal.copy(nodes[id].group.position);radiusGoal=18;lastInteract=performance.now();const inf=nodes[id].info;$("#panelBody").textContent="";const h=document.createElement("h2"),p=document.createElement("p");h.textContent=inf.title;p.textContent=inf.text;$("#panelBody").append(h,p);panel.style.display="block";};
+$("#resetView").onclick=()=>{targetGoal.copy(homeTarget);radiusGoal=HOME_RADIUS;theta=-.85;phi=1.1;panel.style.display="none";$("#componentSelect").value="";};
+$("#zoomIn").onclick=()=>radiusGoal=Math.max(14,radiusGoal-5);
+$("#zoomOut").onclick=()=>radiusGoal=Math.min(90,radiusGoal+5);
+$("#motionToggle").onclick=()=>{sceneMotion=!sceneMotion;$("#motionToggle").textContent=sceneMotion?"Pause motion":"Resume motion";if(!sceneMotion)stopAuto();};
+if(reducedMotion){stopAuto();$("#motionToggle").textContent="Resume motion";}
+$("#mapCapture").onclick=()=>{composer?composer.render():renderer.render(scene,camera);const a=document.createElement("a");a.download="aegis-v4-architecture.png";a.href=renderer.domElement.toDataURL("image/png");a.click();};
+function mapTheme(){const light=document.documentElement.dataset.theme==="light";scene.background.set(light?0xABBFB3:0x101916);scene.fog.color.copy(scene.background);renderer.toneMappingExposure=light?.72:1.15;if(bloomPass){bloomPass.enabled=!light;bloomPass.strength=.45;}scene.traverse(o=>{if(o.isSprite&&o.material.blending===THREE.AdditiveBlending)o.visible=!light;});}
+mapTheme();document.addEventListener("aegis:theme",mapTheme);
 </script>
 </body>
 </html>

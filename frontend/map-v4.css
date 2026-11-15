@@ -1,0 +1,155 @@
+:root {
+  --bg: #101916;
+  --text: #e6eee9;
+  --muted: #b8c8bf;
+  --faint: #96a99e;
+  --gold: #7fd9b0;
+  --gold-hi: #b6efd2;
+  --border: #4c786166;
+}
+[data-theme="light"] {
+  --bg: #e8eeeb;
+  --text: #17382b;
+  --muted: #3d6151;
+  --faint: #4e6b5b;
+  --gold: #24694f;
+  --gold-hi: #164f36;
+  --border: #75958477;
+}
+* {
+  letter-spacing: 0 !important;
+}
+.topbar {
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 22px;
+  align-items: center;
+}
+.brand .mark {
+  box-shadow: none;
+  background: #8dceac;
+}
+.tagline,
+#hint,
+.stats,
+.legend,
+#renderProfile {
+  display: none !important;
+}
+#vignette {
+  display: none;
+}
+.navlinks a {
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+}
+#mapTools {
+  position: fixed;
+  top: 75px;
+  left: 20px;
+  right: 20px;
+  z-index: 6;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  font:
+    12px Inter,
+    sans-serif;
+}
+#mapTools label {
+  font-size: 10px;
+  color: var(--muted);
+}
+#mapTools button,
+#mapTools select {
+  font:
+    12px Inter,
+    sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  min-height: 34px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+#mapTools button:hover {
+  border-color: var(--gold);
+}
+#mapTools select {
+  max-width: 175px;
+}
+#panel {
+  top: 132px;
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 8px;
+  max-height: calc(100vh - 230px);
+  overflow: auto;
+}
+.rail {
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  padding: 12px;
+  flex-wrap: nowrap;
+  overflow: auto;
+  justify-content: flex-start;
+}
+.phase,
+.playbtn {
+  border-radius: 6px;
+  flex: none;
+  background: var(--bg);
+  color: var(--text);
+}
+.phase.on,
+.playbtn {
+  background: #83c7a1;
+  color: #102c1c;
+}
+.phase .num {
+  color: inherit;
+}
+:focus-visible {
+  outline: 3px solid #319e79;
+  outline-offset: 3px;
+}
+#scene {
+  touch-action: none;
+}
+#tip {
+  background: var(--bg);
+  color: var(--text);
+}
+@media (max-width: 760px) {
+  #mapTools {
+    top: 65px;
+    left: 10px;
+    right: 10px;
+    gap: 5px;
+  }
+  #mapTools label {
+    display: none;
+  }
+  #mapTools button,
+  #mapTools select {
+    font-size: 11px;
+    padding: 6px;
+  }
+  #mapTools select {
+    max-width: 135px;
+  }
+  #panel {
+    top: 150px;
+    left: 10px;
+    right: 10px;
+  }
+  .topbar {
+    padding: 12px;
+  }
+  .navlinks a {
+    font-size: 11px;
+  }
+}

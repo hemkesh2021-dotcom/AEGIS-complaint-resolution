@@ -63,7 +63,7 @@ class ExternalPromptPrivacyTest {
         Draft draft = service.draft(name, "CMP-TEST " + narrative, "Category: " + narrative,
                 narrative + IDENTIFIERS, compliance, context);
 
-        assertEquals("NVIDIA NIM (RAG)", draft.source(), "fallback must not hide a broken model path");
+        assertEquals("AI (RAG)", draft.source(), "fallback must not hide a broken model path");
         assertEquals("Complaint update", draft.subject());
         assertEquals("Dear " + name + ", we will review your complaint.", draft.body());
         assertRedacted(model, name);

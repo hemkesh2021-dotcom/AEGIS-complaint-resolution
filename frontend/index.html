@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>AEGIS Operator Console</title>
+<title>AEGIS 4 | Resolution workspace</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -146,6 +146,8 @@
     #fx{display:none}
   }
 </style>
+<link rel="stylesheet" href="v4.css">
+<script src="theme.js"></script>
 </head>
 <body>
 <canvas id="fx" aria-hidden="true"></canvas>
@@ -162,8 +164,8 @@
     <div class="panel">
       <div class="status-title">System status</div>
       <div class="status-row"><span id="apiDot" class="dot grey"></span> <span id="apiTxt">Checking API…</span></div>
-      <div class="status-row"><span class="dot green"></span> DistilBERT · 11 categories</div>
-      <div class="status-row"><span class="dot green"></span> pgvector knowledge base</div>
+      <div class="status-row"><span class="dot grey"></span> Classifier · 11 categories</div>
+      <div class="status-row"><span class="dot grey"></span> Local retrieval configured</div>
       <div class="status-row" style="margin-top:6px;padding-top:8px;border-top:1px solid var(--border)"><a href="inbox.html" style="color:var(--muted);text-decoration:none;font-size:12.5px">✉ AEGIS Mail — customer inbox →</a></div>
     </div>
     <div class="spacer"></div>
@@ -178,12 +180,14 @@
 
   <main>
     <div class="hero">
-      <h1>Operator <b>Console</b></h1>
-      <p>Work the queue by urgency → open a case → review the AI analysis and drafted reply → approve &amp; send.</p>
+      <div class="workspace-heading"><div><span class="eyebrow">AEGIS / OPERATIONS</span><h1 id="viewTitle">Resolution workspace</h1><p id="viewSubtitle">Every case. A clear next step.</p></div><div class="head-actions"><button class="icon-button" id="commandOpen" title="Search commands" aria-label="Search commands"><i data-lucide="command"></i></button><button class="icon-button" data-theme-toggle title="Toggle color theme" aria-label="Toggle color theme"><i data-lucide="sun-moon"></i></button><span class="release-badge">v4.0</span></div></div>
     </div>
 
     <!-- QUEUE -->
     <section id="tab-queue">
+      <div class="queue-metrics" id="queueMetrics" aria-live="polite"></div>
+      <div class="queue-tools"><label class="search-field"><i data-lucide="search"></i><input id="queueSearch" type="search" placeholder="Search case, customer or category" aria-label="Search cases"></label><select id="queueSort" aria-label="Sort cases"><option value="urgency">Urgency first</option><option value="deadline">Deadline first</option><option value="newest">Newest first</option></select><button class="icon-button" id="saveView" title="Save current view" aria-label="Save current view"><i data-lucide="bookmark-plus"></i></button><button class="icon-button" id="exportQueue" title="Export filtered queue" aria-label="Export filtered queue"><i data-lucide="download"></i></button></div>
+      <div class="saved-views"><label for="savedViews">Saved views</label><select id="savedViews"><option value="">Select a view</option></select><button id="deleteView" class="icon-button" title="Delete selected view" aria-label="Delete selected view"><i data-lucide="trash-2"></i></button><span id="queueResultCount" aria-live="polite"></span></div>
       <div class="toolbar" id="filters">
         <button class="filterchip active" data-f="review">Needs review</button>
         <button class="filterchip" data-f="escalated">Escalated</button>
@@ -309,7 +313,8 @@ EXAMPLES.forEach((e,i)=>{const o=document.createElement("option");o.value=i;o.te
 function loadExample(){const e=EXAMPLES[$("#ex").value];if(!e)return;$("#text").value=e.text;$("#cust").value=e.cust}
 loadExample();
 function activate(t){document.querySelectorAll(".navbtn").forEach(x=>x.classList.toggle("active",x.dataset.tab===t));
-  ["queue","esc","new","ins","sys"].forEach(x=>$("#tab-"+x).classList.toggle("hide",x!==t));
+  ["queue","esc","new","ins","sys","providers"].forEach(x=>$("#tab-"+x)?.classList.toggle("hide",x!==t));
+  document.dispatchEvent(new CustomEvent("aegis:view",{detail:t}));
   if(t==="queue")loadQueue(); if(t==="esc")loadEsc(); if(t==="ins")loadInsights();
   if(t==="sys"){const f=$("#sysFrame");if(f&&!f.src)f.src=f.dataset.src;}}
 document.querySelectorAll(".navbtn").forEach(b=>b.onclick=()=>activate(b.dataset.tab));
@@ -320,7 +325,7 @@ document.querySelectorAll(".filterchip").forEach(b=>b.onclick=()=>{FILTER=b.data
 // ── queue ──
 async function loadQueue(){
   const b=$("#queueBody");
-  if(!KEY()){b.innerHTML='<div class="empty">Enter your operator API key in the sidebar to load the queue.</div>';$("#qCount").classList.add("hide");return;}
+  if(!KEY()&&!ssoToken()){b.innerHTML='<div class="empty">Sign in with SSO or enter your operator API key to load the queue.</div>';$("#qCount").classList.add("hide");return;}
   try{
     let rows=await (await apiFetch(api()+"/api/complaints")).json();
     const pending=rows.filter(c=>c.status!=="SENT").length;
@@ -572,11 +577,11 @@ async function checkStatus(){
 $("#apiBase").addEventListener("change",()=>{checkStatus();loadQueue()});
 $("#apiKey").value=localStorage.getItem("aegisKey")||"";
 $("#apiKey").addEventListener("change",()=>{localStorage.setItem("aegisKey",$("#apiKey").value);loadQueue();});
-ssoHandleCallback().then(()=>{renderSso();checkStatus();loadQueue();});
+// v4.js initializes the authenticated workspace after installing queue controls.
 
 // ── ambient gold-dust background (skipped for reduced-motion) ──
 (()=>{
-  if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+  return; // v4 uses a quiet workspace; animation lives in the system map.
   const cv=document.getElementById("fx");if(!cv)return;
   const x=cv.getContext("2d");let W,H,pts=[];
   function size(){W=cv.width=innerWidth*devicePixelRatio;H=cv.height=innerHeight*devicePixelRatio;
@@ -606,5 +611,7 @@ ssoHandleCallback().then(()=>{renderSso();checkStatus();loadQueue();});
   requestAnimationFrame(frame);
 })();
 </script>
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<script src="v4.js"></script>
 </body>
 </html>

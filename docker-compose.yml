@@ -70,6 +70,19 @@ services:
       # LLM drafting via NVIDIA NIM. Unset = template fallback (retrieval still works).
       NIM_API_KEY: ${NIM_API_KEY:-nvapi-not-set}
       NIM_CHAT_MODEL: ${NIM_CHAT_MODEL:-openai/gpt-oss-120b}
+      AEGIS_LLM_PROVIDER: ${AEGIS_LLM_PROVIDER:-nim}
+      AEGIS_LLM_MODEL: ${AEGIS_LLM_MODEL:-}
+      AEGIS_LLM_BASE_URL: ${AEGIS_LLM_BASE_URL:-}
+      AEGIS_LLM_API_KEY: ${AEGIS_LLM_API_KEY:-}
+      AEGIS_LLM_TIMEOUT_SECONDS: ${AEGIS_LLM_TIMEOUT_SECONDS:-30}
+      AEGIS_LLM_ALLOW_HTTP: ${AEGIS_LLM_ALLOW_HTTP:-false}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_VERSION: ${ANTHROPIC_VERSION:-2023-06-01}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
       AEGIS_API_KEY: ${AEGIS_API_KEY:-aegis-dev-key-change-me}
       AEGIS_ALLOWED_ORIGINS: ${AEGIS_ALLOWED_ORIGINS:-http://localhost:8088}
       # Distributed rate limiting (falls back to in-memory if Redis is down)

@@ -1,0 +1,11 @@
+{
+  "name": "aegis-workspace",
+  "version": "4.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node tests/workspace.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

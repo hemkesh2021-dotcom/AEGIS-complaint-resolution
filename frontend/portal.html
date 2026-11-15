@@ -80,10 +80,13 @@
   ::-webkit-scrollbar-track{background:transparent}
   @media (prefers-reduced-motion: reduce){body::before,.brand .mark{animation:none}.card,.btn::after{transition:none}#fx{display:none}}
 </style>
+<link rel="stylesheet" href="public-v4.css">
+<script src="theme.js"></script>
 </head>
 <body>
 <canvas id="fx" aria-hidden="true"></canvas>
 <div class="wrap">
+  <button class="theme-toggle" data-theme-toggle aria-label="Toggle color theme">Light / dark</button>
   <div class="brand"><span class="mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2A1C04" stroke-width="2.2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/></svg></span>AEGIS</div>
   <p class="sub">Customer complaint portal — lodge a complaint and track its progress.</p>
 
@@ -91,11 +94,11 @@
     <h2>Lodge a <b>complaint</b></h2>
     <p class="hint">Tell us what happened. You'll get a reference number and a date by which we'll respond.</p>
     <div class="two">
-      <div><label>Your name</label><input id="name" value="A. Rao"/></div>
+      <div><label for="name">Your name</label><input id="name" autocomplete="name" placeholder="Full name"/></div>
       <div><label>Email (optional)</label><input id="email" placeholder="you@example.com"/></div>
     </div>
     <label>What happened?</label>
-    <textarea id="text" placeholder="Describe your complaint in your own words…">I noticed three charges on my credit card last week that I never authorized — $420 total to a merchant I have never heard of. I reported my card as compromised but nothing has been reversed.</textarea>
+    <textarea id="text" aria-label="Complaint narrative" placeholder="Describe your complaint in your own words…"></textarea>
     <button class="btn" id="send" onclick="lodge()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12H7l-3 3z"/></svg>Submit complaint</button>
     <div class="cfg">Service endpoint <input id="apiBase" value="http://localhost:8080"/></div>
   </div>
