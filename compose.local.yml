@@ -1,0 +1,29 @@
+# Local preview only: keep demo services off the LAN and avoid paid model calls.
+# First run: bash infra/prepare-preview.sh
+# docker compose -f docker-compose.yml -f compose.local.yml up -d --build
+services:
+  db:
+    ports: !override
+      - "127.0.0.1:5432:5432"
+  classifier:
+    ports: !override
+      - "127.0.0.1:8000:8000"
+  keycloak:
+    ports: !override
+      - "127.0.0.1:8089:8080"
+  mailhog:
+    ports: !override
+      - "127.0.0.1:8025:8025"
+  api:
+    environment:
+      AEGIS_LLM_PROVIDER: template
+      # Pinned local model plus bundled tokenizer; no model download inside the API.
+      SPRING_AI_EMBEDDING_TRANSFORMER_ONNX_MODELURI: file:/opt/aegis-models/model.onnx
+      SPRING_AI_EMBEDDING_TRANSFORMER_TOKENIZER_URI: classpath:/onnx/all-MiniLM-L6-v2/tokenizer.json
+    volumes:
+      - ./.local/embedding:/opt/aegis-models:ro
+    ports: !override
+      - "127.0.0.1:8080:8080"
+  web:
+    ports: !override
+      - "127.0.0.1:8088:80"

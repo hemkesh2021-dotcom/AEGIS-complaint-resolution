@@ -7,7 +7,7 @@ const { createServer } = require("node:http");
 
 const root = path.resolve(__dirname, "..");
 
-// Freeze the approved interface from 15a8090; only the map renderer may change.
+// Preserve original markup, styles and business logic; allow the isolated motion layer.
 const original = {
   "index.html":
     "bf2e58aad16536208bf0bca3223360e4a72b990bdd7a285b437e05efa1b88864",
@@ -20,6 +20,9 @@ const original = {
 };
 for (const [name, hash] of Object.entries(original)) {
   let source = fs.readFileSync(path.join(root, name), "utf8");
+  source = source
+    .replace('<link rel="stylesheet" href="motion.css">\n', "")
+    .replace('<script src="motion.js" defer></script>\n', "");
   if (name === "architecture.html")
     source = source.slice(0, source.indexOf("<script>"));
   assert.equal(
@@ -72,7 +75,9 @@ async function canvasPixels(page) {
         ? "text/css"
         : file.endsWith(".js")
           ? "text/javascript"
-          : "text/html",
+          : file.endsWith(".svg")
+            ? "image/svg+xml"
+            : "text/html",
     );
     res.end(fs.readFileSync(file));
   });
@@ -92,8 +97,9 @@ async function canvasPixels(page) {
       ],
     });
     const artifacts =
-      process.env.AEGIS_TEST_ARTIFACTS || "/tmp/aegis-v4.0.1-browser";
+      process.env.AEGIS_TEST_ARTIFACTS || "/tmp/aegis-motion-browser";
     fs.mkdirSync(artifacts, { recursive: true });
+    await require("./portals.cjs")({ browser, base, artifacts });
     const errors = [];
     const page = await browser.newPage({
       viewport: { width: 1440, height: 1000 },
@@ -194,6 +200,31 @@ async function canvasPixels(page) {
       assert.equal(diag.particles, constrained ? 1100 : 5000);
       assert.equal(diag.shadowMapSize, constrained ? 1024 : 4096);
       assert.equal(diag.reflectionSize, constrained ? 256 : 1024);
+      assert.equal(diag.screenTextureScale, constrained ? 1 : 2);
+      assert.deepEqual(
+        await page.evaluate(() =>
+          nodes.classifier.group.userData.neural.layers.map(
+            (layer) => layer.length,
+          ),
+        ),
+        [4, 6, 11],
+      );
+      assert.ok(diag.visibleLabels > 3);
+      for (let i = 0; i < diag.labelBounds.length; i++) {
+        for (let j = i + 1; j < diag.labelBounds.length; j++) {
+          const a = diag.labelBounds[i],
+            b = diag.labelBounds[j];
+          assert.ok(
+            !(
+              a.left < b.right &&
+              a.right > b.left &&
+              a.top < b.bottom &&
+              a.bottom > b.top
+            ),
+            "3D labels must not overlap",
+          );
+        }
+      }
       assert.equal(diag.postProcessing, true);
       assert.ok(diag.drawCalls > 0 && diag.triangles > 0);
       assert.equal(await page.locator(".phase").count(), 9);
@@ -234,6 +265,7 @@ async function canvasPixels(page) {
         steps: 5,
       });
       await page.mouse.up();
+      await page.waitForTimeout(650);
       assert.ok(
         Math.abs((await page.evaluate(() => theta)) - startTheta) > 0.2,
         "original orbit control works",
@@ -244,6 +276,37 @@ async function canvasPixels(page) {
         .locator("#scene")
         .dblclick({ position: { x: size.width / 2, y: size.height / 2 } });
       assert.equal(await page.evaluate(() => radiusGoal === HOME_RADIUS), true);
+      await page.waitForTimeout(1000);
+      const classifierPoint = await page.evaluate(() => {
+        const point = nodes.classifier.mesh
+          .getWorldPosition(new THREE.Vector3())
+          .project(camera);
+        return {
+          x: ((point.x + 1) * innerWidth) / 2,
+          y: ((1 - point.y) * innerHeight) / 2,
+        };
+      });
+      await page.mouse.click(classifierPoint.x, classifierPoint.y);
+      await page.locator("#panel h2").waitFor();
+      assert.equal(
+        await page.locator("#panel h2").textContent(),
+        "Neural Classifier",
+      );
+      const signalBefore = await page.evaluate(() =>
+        nodes.classifier.group.userData.neural.signals[0].marker.position.toArray(),
+      );
+      await page.waitForTimeout(400);
+      assert.notDeepEqual(
+        await page.evaluate(() =>
+          nodes.classifier.group.userData.neural.signals[0].marker.position.toArray(),
+        ),
+        signalBefore,
+      );
+      await page.screenshot({
+        path: path.join(artifacts, `classifier-focus-${size.width}.png`),
+      });
+      await page.keyboard.press("Escape");
+      assert.equal(await page.locator("#panel").isVisible(), false);
       console.log(`${size.width}px: ${JSON.stringify({ ...diag, pixels })}`);
     }
 
@@ -261,6 +324,133 @@ async function canvasPixels(page) {
     await page.waitForTimeout(3000);
     assert.ok((await canvasPixels(page)).colors > 20);
 
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto(base + "/architecture.html");
+    await page.waitForFunction(
+      () => typeof window.__AEGIS_VISUAL_DIAGNOSTICS__ === "function",
+    );
+    await page.waitForTimeout(500);
+    const still = await page.evaluate(() => ({
+      theta,
+      motionTime,
+      auto,
+      signal:
+        nodes.classifier.group.userData.neural.signals[0].marker.position.toArray(),
+    }));
+    await page.waitForTimeout(500);
+    assert.deepEqual(
+      await page.evaluate(() => ({
+        theta,
+        motionTime,
+        auto,
+        signal:
+          nodes.classifier.group.userData.neural.signals[0].marker.position.toArray(),
+      })),
+      still,
+      "reduced-motion stops idle camera and scene animation",
+    );
+    assert.equal(still.auto, false);
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await page.waitForTimeout(300);
+    assert.ok(
+      await page.evaluate(() => motionTime > 0),
+      "motion preference changes are respected without reloading",
+    );
+
+    const geometry = () =>
+      [
+        ...document.querySelectorAll(
+          "aside,main,.card,.toolbar,button,input,textarea,select,.hero,.brand,.app,.msgs,.reader",
+        ),
+      ]
+        .filter((e) => e.getClientRects().length)
+        .map((e) => {
+          const b = e.getBoundingClientRect(),
+            s = getComputedStyle(e);
+          return {
+            tag: e.tagName,
+            id: e.id,
+            text: e.tagName === "BUTTON" ? e.textContent.trim() : null,
+            rect: [b.x, b.y, b.width, b.height].map(
+              (n) => Math.round(n * 100) / 100,
+            ),
+            color: s.color,
+            font: s.font,
+            fontSize: s.fontSize,
+            borderRadius: s.borderRadius,
+          };
+        });
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 1000 });
+      for (const file of ["index.html", "portal.html", "inbox.html"]) {
+        const measures = [];
+        for (const disabled of [false, true]) {
+          if (disabled)
+            await page.route("**/motion.*", (route) => route.abort());
+          await page.goto(base + "/" + file);
+          await page.mouse.move(0, 0);
+          await page.evaluate(() => document.fonts.ready);
+          if (file === "index.html")
+            await page.locator("#queueBody tr.clickable").first().waitFor();
+          if (file === "inbox.html")
+            await page.waitForFunction(
+              () =>
+                !document
+                  .querySelector("#msgs")
+                  .textContent.includes("Connecting"),
+            );
+          await page.waitForTimeout(700);
+          measures.push(await page.evaluate(geometry));
+          if (!disabled)
+            await page.screenshot({
+              path: path.join(artifacts, `${file}-${width}.png`),
+            });
+          if (disabled) await page.unroute("**/motion.*");
+        }
+        if (file === "index.html" && width < 821) {
+          const withoutGeometry = (items) =>
+            items.map(({ rect, ...item }) => item);
+          assert.deepEqual(
+            withoutGeometry(measures[0]),
+            withoutGeometry(measures[1]),
+            "mobile console containment must retain the original type, colors and controls",
+          );
+        } else if (!(file === "inbox.html" && width < 1001)) {
+          assert.deepEqual(
+            measures[0],
+            measures[1],
+            `${file} ${width}px: visual layer must not change original layout, typography, colors or controls`,
+          );
+        }
+      }
+    }
+
+    await page.goto(base + "/index.html");
+    await page.locator('[data-tab="new"]').click();
+    await page.waitForFunction(
+      () => window.__AEGIS_MOTION_DIAGNOSTICS__().activeAnimations > 0,
+    );
+    await page.locator("#apiKey").focus();
+    assert.equal(
+      await page
+        .locator("#apiKey")
+        .evaluate((e) => getComputedStyle(e).outlineStyle),
+      "solid",
+    );
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.waitForFunction(
+      () =>
+        window.__AEGIS_MOTION_DIAGNOSTICS__().reducedMotion &&
+        window.__AEGIS_MOTION_DIAGNOSTICS__().activeAnimations === 0,
+    );
+    assert.equal(
+      await page.evaluate(
+        () => window.__AEGIS_MOTION_DIAGNOSTICS__().activeAnimations,
+      ),
+      0,
+    );
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto(base + "/inbox.html");
     await page.waitForFunction(
@@ -270,7 +460,7 @@ async function canvasPixels(page) {
     await page.screenshot({ path: path.join(artifacts, "original-inbox.png") });
     assert.deepEqual(errors, []);
     console.log(
-      "PASS: original UI fingerprints, queue filters, example selection, portal/inbox, desktop/mobile graphics, animation, orbit/zoom/reset, journey and rendering fallback.",
+      "PASS: original UI fingerprints and layout comparisons, motion feedback, reduced motion, queue filters, portal/inbox, desktop/mobile graphics, label collisions, orbit/zoom/reset, journey and rendering fallback.",
     );
     console.log("Artifacts: " + artifacts);
   } finally {

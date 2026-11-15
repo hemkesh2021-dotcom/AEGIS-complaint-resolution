@@ -1,0 +1,349 @@
+/* Additive surface rendering: preserve the original layout, type and palette. */
+html[data-aegis-motion="enhanced"][data-aegis-surface] {
+  --finish-highlight: rgba(255, 250, 240, 0.09);
+  --finish-lowlight: rgba(0, 0, 0, 0.3);
+  --finish-edge: rgba(240, 207, 142, 0.055);
+  --finish-shadow: rgba(8, 5, 2, 0.42);
+}
+html[data-aegis-motion="enhanced"][data-aegis-surface="mail"] {
+  --finish-highlight: rgba(255, 255, 255, 0.95);
+  --finish-lowlight: rgba(23, 21, 15, 0.07);
+  --finish-edge: rgba(255, 255, 255, 0.7);
+  --finish-shadow: rgba(23, 21, 15, 0.1);
+}
+html[data-aegis-motion="enhanced"][data-aegis-surface]
+  :is(.card, .panel, .ack) {
+  background-image: linear-gradient(
+    135deg,
+    rgba(255, 250, 240, 0.028),
+    transparent 52%
+  );
+  box-shadow:
+    inset 0 1px 0 var(--finish-highlight),
+    inset 0 -1px 0 var(--finish-lowlight),
+    0 0 0 1px var(--finish-edge),
+    0 10px 28px -12px var(--finish-shadow);
+}
+html[data-aegis-motion="enhanced"][data-aegis-surface]
+  :is(input, textarea, select, .email) {
+  box-shadow:
+    inset 0 2px 5px var(--finish-lowlight),
+    0 1px 0 var(--finish-edge);
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease;
+}
+html[data-aegis-motion="enhanced"][data-aegis-surface]
+  :is(input, textarea, select):focus {
+  box-shadow:
+    inset 0 2px 5px var(--finish-lowlight),
+    0 0 0 3px var(--finish-edge),
+    0 3px 12px -6px var(--finish-shadow);
+}
+html[data-aegis-motion="enhanced"][data-aegis-surface] :is(.btn, .abtn) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 var(--finish-lowlight),
+    0 3px 7px -3px var(--finish-shadow);
+}
+html[data-aegis-motion="enhanced"][data-aegis-surface]
+  :is(.btn.ghost, .abtn, .navbtn.active, .folder.active, .filterchip.active) {
+  box-shadow:
+    inset 0 1px 0 var(--finish-highlight),
+    inset 0 -1px 0 var(--finish-lowlight),
+    0 3px 8px -4px var(--finish-shadow);
+}
+html[data-aegis-motion="enhanced"][data-aegis-surface="mail"] .folder.active {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+    0 5px 12px -6px rgba(23, 21, 15, 0.35);
+}
+html[data-aegis-motion="enhanced"][data-aegis-surface]
+  :is(.btn, .abtn):active:not(:disabled) {
+  box-shadow:
+    inset 0 2px 4px var(--finish-lowlight),
+    0 1px 0 var(--finish-edge);
+}
+html[data-aegis-motion="enhanced"][data-aegis-surface] .btn:disabled {
+  box-shadow: none;
+}
+html[data-aegis-motion="enhanced"][data-aegis-surface="console"]
+  tr.sel
+  td:first-child {
+  box-shadow: inset 2px 0 0 var(--gold);
+}
+html[data-aegis-motion="enhanced"][data-aegis-surface="console"]
+  :is(.conf, .stepper .rail) {
+  box-shadow: inset 0 1px 3px var(--finish-lowlight);
+}
+html[data-aegis-motion="enhanced"][data-aegis-surface="console"]
+  :is(.conf > div, .node.done) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+html[data-aegis-motion="enhanced"][data-aegis-surface="portal"] .ack .tick {
+  box-shadow:
+    inset 0 1px 0 rgba(91, 191, 146, 0.3),
+    0 3px 12px -5px rgba(91, 191, 146, 0.3);
+}
+html[data-aegis-motion="enhanced"][data-aegis-surface="mail"]
+  :is(.rail, .list) {
+  box-shadow: 1px 0 0 var(--finish-highlight);
+}
+html[data-aegis-motion="enhanced"][data-aegis-surface="mail"] .msg {
+  animation: none;
+}
+html[data-aegis-motion="enhanced"][data-aegis-surface="mail"] .msg.sel {
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 1px 2px rgba(23, 21, 15, 0.04),
+    0 7px 18px -10px rgba(23, 21, 15, 0.22);
+}
+html[data-aegis-motion="enhanced"][data-aegis-surface="mail"] .av {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(23, 21, 15, 0.08);
+}
+html[data-aegis-motion="enhanced"][data-aegis-surface="mail"] .rhead {
+  box-shadow:
+    0 1px 0 var(--hair),
+    0 2px 0 var(--finish-highlight);
+}
+html[data-aegis-motion="enhanced"][data-aegis-surface="mail"] .paper {
+  box-shadow:
+    0 1px 2px rgba(23, 21, 15, 0.05),
+    0 12px 28px -16px rgba(23, 21, 15, 0.2),
+    0 28px 60px -32px rgba(23, 21, 15, 0.22);
+}
+html[data-aegis-motion="enhanced"]
+  :is(.btn, .navbtn, .filterchip, .folder, .abtn, .phase, .playbtn) {
+  transition-property:
+    color, background-color, border-color, box-shadow, filter, transform;
+  transition-duration: 220ms;
+  transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+html[data-aegis-motion="enhanced"] :is(.card, .panel, .msg, .paper) {
+  transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+html[data-aegis-motion="enhanced"]
+  :is(button, a, input, textarea, select):focus-visible {
+  outline: 2px solid var(--gold-hi, var(--accent, #b8862f));
+  outline-offset: 3px;
+}
+html[data-aegis-motion="enhanced"] button svg {
+  transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@media (hover: hover) and (pointer: fine) {
+  html[data-aegis-motion="enhanced"][data-aegis-surface] .card:hover {
+    transform: none;
+    box-shadow:
+      inset 0 1px 0 var(--finish-highlight),
+      inset 0 -1px 0 var(--finish-lowlight),
+      0 0 0 1px var(--finish-edge),
+      0 14px 32px -12px var(--finish-shadow);
+  }
+  html[data-aegis-motion="enhanced"] button:hover:not(:disabled) svg {
+    transform: translateY(-1px);
+  }
+  html[data-aegis-motion="enhanced"]
+    :is(.navbtn, .filterchip, .phase, .playbtn):hover {
+    box-shadow:
+      inset 0 1px 0 rgba(240, 207, 142, 0.12),
+      0 4px 14px rgba(0, 0, 0, 0.16);
+  }
+}
+html[data-aegis-motion="enhanced"] .btn.aegis-press::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at var(--press-x, 50%) var(--press-y, 50%),
+    rgba(255, 255, 255, 0.3),
+    transparent 65%
+  );
+  animation: aegis-press 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes aegis-press {
+  from {
+    opacity: 0.8;
+    clip-path: circle(0 at var(--press-x, 50%) var(--press-y, 50%));
+  }
+  to {
+    opacity: 0;
+    clip-path: circle(140% at var(--press-x, 50%) var(--press-y, 50%));
+  }
+}
+#scene {
+  touch-action: none;
+}
+/* Keep long identifiers inside their existing content surfaces. */
+html[data-aegis-surface="portal"] :is(.ref, .email, .kv > span),
+html[data-aegis-surface="console"] :is(.wstitle, .email, .kv > span),
+html[data-aegis-surface="mail"]
+  :is(.rhead .subj, .rhead .who, .ref, .rbody pre) {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+html[data-aegis-surface="portal"] .kv {
+  gap: 12px;
+}
+html[data-aegis-surface="portal"] .kv > span:last-child {
+  text-align: right;
+}
+html[data-aegis-surface="portal"] .kv .k {
+  flex: 0 0 96px;
+  overflow-wrap: normal;
+}
+.aegis-reader-back {
+  display: none;
+}
+@media (max-width: 820px) {
+  html[data-aegis-surface="console"] .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html[data-aegis-surface="console"] :is(main, .grid, .card, .two > div) {
+    min-width: 0;
+  }
+  html[data-aegis-surface="console"] #queueBody {
+    overflow-x: auto;
+  }
+  html[data-aegis-surface="console"] #queueBody table {
+    min-width: 640px;
+  }
+  html[data-aegis-surface="console"] .wstitle {
+    max-width: 100%;
+  }
+}
+html[data-aegis-surface="mail"] .msg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+@media (max-width: 1000px) {
+  html[data-aegis-surface="mail"] .reader {
+    height: 100dvh;
+  }
+  html[data-aegis-surface="mail"] .aegis-reader-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    align-self: flex-start;
+    flex: none;
+    min-height: 44px;
+    margin: 12px 20px 0;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--hair2);
+    background: var(--paper);
+    color: var(--ink);
+    font:
+      500 13px "Inter",
+      sans-serif;
+    cursor: pointer;
+  }
+  .aegis-reader-back img {
+    width: 18px;
+    height: 18px;
+  }
+  html[data-aegis-surface="mail"] .rhead {
+    padding: 18px 20px;
+    max-height: 45dvh;
+    overflow: auto;
+    flex: none;
+  }
+  html[data-aegis-surface="mail"] .rbody {
+    min-height: 0;
+    padding: 12px 20px 20px;
+  }
+  html[data-aegis-surface="mail"] .rbody pre {
+    padding: 20px;
+  }
+}
+@media (max-width: 640px) {
+  html[data-aegis-surface="mail"] .app {
+    height: 100dvh;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  html[data-aegis-surface="mail"] .rail {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    padding: 14px 16px 12px;
+    border-right: none;
+    border-bottom: 1px solid var(--hair);
+  }
+  html[data-aegis-surface="mail"] .rail :is(.brand, .links, .cfg) {
+    grid-column: 1 / -1;
+  }
+  html[data-aegis-surface="mail"] .brand {
+    padding: 0 4px 8px;
+  }
+  html[data-aegis-surface="mail"] .folder {
+    padding: 10px 8px;
+    gap: 6px;
+    min-height: 44px;
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+  html[data-aegis-surface="mail"] .folder :is(.cnt, .glyph) {
+    flex: none;
+  }
+  html[data-aegis-surface="mail"] .rail .spacer {
+    display: none;
+  }
+  html[data-aegis-surface="mail"] .rail .links {
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding-top: 6px;
+  }
+  html[data-aegis-surface="mail"] .rail .links a {
+    padding: 5px;
+    font-size: 11px;
+  }
+  html[data-aegis-surface="mail"] .cfg {
+    padding: 0 4px;
+  }
+  html[data-aegis-surface="mail"] .list {
+    min-height: 0;
+    border-right: none;
+  }
+  html[data-aegis-surface="mail"] .listhead {
+    padding: 18px 20px 6px;
+  }
+  html[data-aegis-surface="mail"] .msg .meta {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 360px) {
+  html[data-aegis-surface="mail"] .folder {
+    padding-inline: 6px;
+    gap: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  html[data-aegis-surface="portal"] .ack .kv {
+    flex-direction: column;
+    gap: 4px;
+  }
+  html[data-aegis-surface="portal"] .ack .kv .k {
+    flex-basis: auto;
+  }
+  html[data-aegis-surface="portal"] .ack .kv > span:last-child {
+    text-align: left;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  #fx {
+    display: none;
+  }
+}

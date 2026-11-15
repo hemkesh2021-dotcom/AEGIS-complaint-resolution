@@ -17,6 +17,7 @@ venv/
 
 # Models & large artifacts (mount or pull at runtime; use GCS/Git LFS)
 models/
+.local/
 *.safetensors
 
 # IDE / OS

@@ -55,6 +55,8 @@ safe-use notes are in [`data/README.md`](data/README.md).
 
 ## Quickstart
 
+For the localhost-only graphics and motion preview, see [Local preview](docs/LOCAL-PREVIEW.md). It preserves the original interface and uses template mode to avoid paid model calls.
+
 ```bash
 cp .env.example .env        # set AEGIS_API_KEY; choose a provider using docs/PROVIDERS.md
 docker compose up --build
