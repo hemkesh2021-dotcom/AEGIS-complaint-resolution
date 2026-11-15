@@ -12,7 +12,8 @@ module.exports = async function verifyPortals({ browser, base, artifacts }) {
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
     const id = "CMP-7FB5F5C5-4066-4E82-AD8D-4F13FCE7A18E";
-    const token = "TRK-7FB5F5C540664E82AD8D4F13FCE7A18E";
+    // Preserve tracking-code length without credential-like random fixture data.
+    const token = "TRK-" + "0".repeat(32);
     const record = {
       complaintId: id,
       customerName: "Preview customer",
@@ -212,6 +213,7 @@ module.exports = async function verifyPortals({ browser, base, artifacts }) {
       await page.locator("#ackWrap .ref").waitFor();
       await page.waitForTimeout(800);
       assert.equal(submitted, 1);
+      assert.equal(await page.locator("#trackId").inputValue(), token);
       assert.equal(await page.locator("#send").isEnabled(), true);
       await fits("#ackWrap .ack, #ackWrap .ref, #ackWrap .kv");
       await page.screenshot({
